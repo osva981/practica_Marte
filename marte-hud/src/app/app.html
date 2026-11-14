@@ -1,135 +1,116 @@
-<div class="marte-app">
-  <header class="top-bar">
-    <div class="titulo">
-      🚀 ARES SAFE-ROUTE 3D | VECTORES PREDICTIVOS (20 NODOS)
-      <span class="badge-accion" *ngIf="datosMision" [ngClass]="datosMision.alerta_radiacion.codigo_accion">
-        {{ datosMision.alerta_radiacion.codigo_accion }}
-      </span>
-    </div>
+<div class="hud-marco-exterior">
+  <div class="hud-contenedor-dorado">
 
-    <div class="controles-demo">
-      <div class="slider-box">
-        <label>Onda de Calor: <strong>{{ intensidadTormenta }}</strong></label>
-        <input type="range" min="10" max="90" step="2" [value]="intensidadTormenta"
-               (input)="cambiarTormenta($any($event.target).value)" />
-      </div>
+    <!-- FILA SUPERIOR: VISOR DE SUPERFICIE (IZQUIERDA) + MAPA MOLA DE CRÁTERES Y NODOS (DERECHA) -->
+    <div class="hud-fila-superior">
 
-      <!-- Selector de Velocidad para que la caminata nunca se sienta lenta -->
-      <div class="grupo-velocidad">
-        <span>Velocidad:</span>
-        <button (click)="cambiarVelocidad(1)" [class.activo]="velocidadSimulacion === 1">1x</button>
-        <button (click)="cambiarVelocidad(2.5)" [class.activo]="velocidadSimulacion === 2.5">2.5x</button>
-        <button (click)="cambiarVelocidad(5)" [class.activo]="velocidadSimulacion === 5">5x</button>
-      </div>
-
-      <button (click)="alternarTormentaProgresiva()" [class.peligro]="tormentaProgresivaActiva">
-        {{ tormentaProgresivaActiva ? '⏹️ Detener Onda' : '🌩️ Onda Progresiva' }}
-      </button>
-      <button (click)="caminataActiva = !caminataActiva" [class.activo]="caminataActiva">
-        {{ caminataActiva ? '⏸️ Pausar' : '▶️ Caminar' }}
-      </button>
-      <button (click)="alternarTexturaMapa()">🗺️ Capa MOLA</button>
-      <button (click)="reiniciarMision()">🔄 Reiniciar</button>
-    </div>
-  </header>
-
-  <main class="grid-pantallas">
-    <!-- 1. MONITOR DE BASE 3D (IZQUIERDA) -->
-    <section class="panel-base">
-      <h2>1. MODELO 3D MONTE SHARP Y ONDA DE CALOR (ARRASTRA Y USA LA RUEDA DEL MOUSE)</h2>
-      <div class="visor-3d-wrapper">
-        <div id="canvas-base-3d" class="lienzo-3d"></div>
-
-        <!-- Botones de Zoom y Enfoque para el Mapa Izquierdo -->
-        <div class="controles-visor-flotantes">
-          <button (click)="ajustarZoomIzquierda(-22)" title="Acercar Mapa">🔍 +</button>
-          <button (click)="ajustarZoomIzquierda(22)" title="Alejar Mapa">🔍 -</button>
-          <button (click)="enfocarAstronautaIzquierda()" title="Enfocar Astronauta">🎯 Seguir Astronauta</button>
+      <!-- PANEL IZQUIERDO: CAMINATA EN SUPERFICIE / 1RA PERSONA -->
+      <div class="panel-dorado panel-mapa-mini">
+        <div class="etiqueta-superior-izq">
+          <span class="icono-pin">📍</span>
+          <span>{{ vistaPrimeraPersona ? 'Visor Casco 1ra Persona' : 'Mapa Mini - Superficie' }}</span>
         </div>
 
-        <div class="overlay-vector">
-          Posición r(t): &lt;{{ posVector3D.x }}m, {{ posVector3D.y }}m, {{ posVector3D.z }}m&gt; |
-          Tangente T(t): &lt;{{ vectorTangenteHUD.tx }}, {{ vectorTangenteHUD.ty }}, {{ vectorTangenteHUD.tz }}&gt;
+        <div class="brujula-norte" [style.transform]="'rotate(' + (-angulosCasco.rumboGrados) + 'deg)'">
+          <span class="letra-n">N</span>
+          <div class="flecha-norte"></div>
         </div>
-      </div>
 
-      <div class="telemetria-grid" *ngIf="datosMision">
-        <div class="card"><span>Distancia Restante:</span> <strong>{{ datosMision.calculos_fisicos.distancia_total_m }} m (Δh +{{ datosMision.calculos_fisicos.desnivel_positivo_m }}m)</strong></div>
-        <div class="card"><span>Velocidad Tobler / Rampa:</span> <strong>{{ datosMision.calculos_fisicos.velocidad_real_m_s }} m/s ({{ datosMision.calculos_fisicos.pendiente_promedio_grados }}°)</strong></div>
-        <div class="card"><span>Dosimetría RAD / Límite:</span> <strong>{{ datosMision.calculos_fisicos.dosis_traje_uSv_h }} µSv/h ({{ datosMision.calculos_fisicos.porcentaje_limite_nasa }}% máx)</strong></div>
-        <div class="card"><span>Metabolismo / Consumo O2:</span> <strong>{{ datosMision.calculos_fisicos.esfuerzo_metabolico_w }} W | {{ datosMision.calculos_fisicos.consumo_o2_l_min }} L/min ({{ datosMision.calculos_fisicos.ritmo_cardiaco_bpm }} bpm)</strong></div>
-      </div>
-    </section>
+        <div id="canvas-mapa-mini" class="lienzo-visor"></div>
 
-    <!-- 2. DISPOSITIVO DE BRAZO CON EVALUACIÓN PREDICTIVA -->
-    <section class="panel-pdr" *ngIf="datosMision">
-      <h2>2. EVALUADOR PREDICTIVO DE TIEMPO (IMPACTO SOLAR EN: {{ formatearTiempo(datosMision.alerta_radiacion.tiempo_para_impacto_seg) }})</h2>
-
-      <div class="tabla-predictiva" *ngIf="datosMision.evaluacion_predictiva">
-        <div class="fila-pred">
-          <span>1. Ruta Cima Directa (ETA {{ formatearTiempo(datosMision.evaluacion_predictiva.eta_cima_seg) }}):</span>
-          <strong [class.viable]="datosMision.evaluacion_predictiva.cima_viable" [class.no-viable]="!datosMision.evaluacion_predictiva.cima_viable">
-            {{ datosMision.evaluacion_predictiva.cima_viable ? '✅ SÍ ALCANZA' : '❌ NO ALCANZA (CAMBIAR RUTA)' }}
-          </strong>
-        </div>
-        <div class="fila-pred">
-          <span>2. Desvío Cañones S1-S4 (ETA {{ formatearTiempo(datosMision.evaluacion_predictiva.eta_desvio_seg) }}):</span>
-          <strong [class.viable]="datosMision.evaluacion_predictiva.desvio_viable" [class.no-viable]="!datosMision.evaluacion_predictiva.desvio_viable">
-            {{ datosMision.evaluacion_predictiva.desvio_viable ? '✅ SÍ ALCANZA (PROTEGIDO)' : '❌ NO ALCANZA (ABORTAR)' }}
-          </strong>
-        </div>
-        <div class="fila-pred">
-          <span>3. Retorno a Base N0 (ETA {{ formatearTiempo(datosMision.evaluacion_predictiva.eta_retorno_seg) }}):</span>
-          <strong class="viable">✅ RUTA DE REGRESO SEGURA</strong>
-        </div>
-      </div>
-
-      <div class="reloj-arm-pad">
-        <div class="pdr-header">
-          NODO ACTUAL: {{ nodoActualId }} ➔ SIGUIENTE PASO: {{ datosMision.siguiente_waypoint }}
-        </div>
-        <ul class="lista-nodos">
-          <li *ngFor="let nodo of datosMision.ruta_grafo_java; let i = index"
-              (click)="seleccionarNodoMapa(nodo.id)"
-              [class.nodo-refugio-li]="nodo.tipo === 'REFUGIO'">
-            <span class="badge-nodo">{{ i === 0 ? '🚶' : nodo.id }}</span>
-            <strong>{{ nodo.nombre }}</strong>
-            <small> | {{ nodo.altitud }}m | {{ nodo.rad_nodo }} µSv/h</small>
-          </li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- 3. VISOR INTERACTIVO DERECHO (CON ZOOM DE RUEDA, GIRO 360° Y CAMBIO DE CÁMARA) -->
-    <section class="panel-hud">
-      <h2>3. VISOR TÁCTICO Y CASCO AR (ARRASTRA PARA ACOMODAR ÁNGULO | RUEDA = ZOOM {{ nivelZoomDerecha }}%)</h2>
-      <div class="visor-3d-wrapper marco-casco">
-        <div id="canvas-hud-3d" class="lienzo-3d"></div>
-
-        <!-- Barra de Controles de Zoom y Cámara para acomodar la pantalla derecha -->
-        <div class="controles-visor-flotantes">
-          <button (click)="ajustarZoomDerecha(-2.0)" title="Acercar Zoom">🔍 Zoom +</button>
-          <button (click)="ajustarZoomDerecha(2.0)" title="Alejar Zoom">🔍 Zoom -</button>
-          <button (click)="alternarModoVistaDerecha()" class="btn-camara">
-            {{ modoVistaDerecha === 'SEGUIMIENTO' ? '👁️ Cambiar a 1ra Persona' : '🛰️ Cambiar a Seguimiento 3D' }}
+        <div class="controles-mini-flotantes">
+          <button (click)="avanzarPasoManual()" class="btn-dorado">⏭️ Avanzar Nodo</button>
+          <button (click)="caminataActiva = !caminataActiva" class="btn-dorado" [class.activo]="caminataActiva">
+            {{ caminataActiva ? '⏸️ Pausar' : '▶️ Caminar' }}
           </button>
-          <button (click)="recentrarCamaraDerecha()" title="Acomodar al frente">🎯 Recentrar</button>
-        </div>
-
-        <div class="hud-brujula">
-          N {{ angulosCasco.rumboGrados }}° E | PENDIENTE {{ angulosCasco.inclinacionGrados }}° | ZOOM {{ nivelZoomDerecha }}%
-        </div>
-
-        <div class="hud-alerta" *ngIf="datosMision" [ngClass]="'alerta-' + datosMision.alerta_radiacion.codigo_accion">
-          {{ datosMision.alerta_radiacion.mensaje_hud }}
-        </div>
-
-        <div class="hud-timers" *ngIf="datosMision">
-          <div>IMPACTO RADIACIÓN EN: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_para_impacto_seg) }}</strong></div>
-          <div>TIEMPO RUTA ACTIVA: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong></div>
-          <div>VENTANA DE SUPERVIVENCIA: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.margen_supervivencia_seg) }}</strong></div>
+          <button (click)="vistaPrimeraPersona = !vistaPrimeraPersona" class="btn-dorado" [class.activo]="vistaPrimeraPersona">
+            {{ vistaPrimeraPersona ? '🛰️ Ver Astronauta 3D' : '👁️ 1ra Persona' }}
+          </button>
+          <button (click)="dispararNodoEscapeClima()" class="btn-dorado btn-alerta">
+            🚨 Crear Nodo Escape ({{ datosMision?.total_nodos_urgencia || 0 }})
+          </button>
         </div>
       </div>
-    </section>
-  </main>
+
+      <!-- PANEL DERECHO: MAPA MOLA DE CRÁTERES, ONDA DE RADIACIÓN Y SALIDA EN TIEMPO REAL -->
+      <div class="panel-dorado panel-vision-3d">
+        <div class="etiqueta-superior-der">
+          <span class="icono-montana">🌐</span>
+          <span>Mapa MOLA Marte - Cráteres y Nodos</span>
+        </div>
+
+        <div id="canvas-vision-3d" class="lienzo-visor"></div>
+
+        <div class="barra-clima-derecha">
+          <label>☀️ Clima / RAD: <strong>{{ intensidadTormenta }}</strong></label>
+          <input type="range" min="10" max="90" step="2" [value]="intensidadTormenta"
+                 (input)="cambiarTormenta($any($event.target).value)" />
+          <button (click)="reiniciarRecorrido()" class="btn-dorado-mini">
+            🔄 Reiniciar
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FILA INFERIOR: INSTRUCCIONES TÁCTICAS AL ASTRONAUTA (IZQUIERDA) | DATOS EXACTOS 3 CAPAS NASA (DERECHA) -->
+    <div class="hud-fila-inferior panel-dorado" *ngIf="datosMision">
+
+      <!-- COLUMNA IZQUIERDA: INSTRUCCIONES EN VIVO PARA AVANZAR AL SIGUIENTE NODO -->
+      <div class="columna-instrucciones">
+        <div class="titulo-seccion-dorada">
+          <span class="icono-dorado">📖</span>
+          <h3>Instrucciones al Astronauta ({{ nodoActualId }} ➔ {{ datosMision.siguiente_waypoint }})</h3>
+        </div>
+        <ol class="lista-instrucciones">
+          <li>1. <strong>Rumbo al Punto [{{ datosMision.siguiente_waypoint }}]:</strong> {{ datosMision.instrucciones_eva.paso_rumbo }}</li>
+          <li>2. <strong>Terreno USGS ({{ datosMision.codigo_usgs }}):</strong> {{ datosMision.instrucciones_eva.paso_terreno }}</li>
+          <li>3. <strong>Acción Climática:</strong> {{ datosMision.instrucciones_eva.paso_clima }}</li>
+        </ol>
+        <div class="estado-tactico-java">
+          <span>Clima MEDA: <strong>{{ datosMision.clima_meda.temp_c }}°C | Viento {{ datosMision.clima_meda.viento_kmh }} km/h | {{ datosMision.clima_meda.presion_hpa }} hPa</strong></span>
+          <span class="alerta-clima-texto">{{ datosMision.alerta_radiacion.mensaje_hud }}</span>
+        </div>
+      </div>
+
+      <div class="divisor-vertical-dorado"></div>
+
+      <!-- COLUMNA DERECHA: DATOS EXACTOS DE LA RUTA Y LAS 3 CAPAS CIENTÍFICAS -->
+      <div class="columna-datos-ruta">
+        <div class="titulo-seccion-dorada">
+          <span class="icono-dorado">📊</span>
+          <h3>Datos de la Ruta</h3>
+        </div>
+
+        <!-- 1. Topografía MOLA + Distancia -->
+        <div class="fila-dato-ruta">
+          <span class="icono-blanco">⛰️</span>
+          <span>
+            Distancia: <strong>{{ datosMision.calculos_fisicos.distancia_total_m }} m</strong>
+            | 1. MOLA: <strong>{{ datosMision.altitud_actual_m }} m (Pendiente {{ datosMision.pendiente_actual_grados }}°)</strong>
+          </span>
+        </div>
+
+        <!-- 2. Cinemática EVA + Geología USGS SIM 3292 -->
+        <div class="fila-dato-ruta">
+          <span class="icono-blanco">🧭</span>
+          <span>
+            Velocidad: <strong>{{ datosMision.calculos_fisicos.velocidad_real_m_s }} m/s</strong>
+            | 2. USGS: <strong>{{ datosMision.unidad_geologica }}</strong>
+          </span>
+        </div>
+
+        <!-- 3. ETA + Dosimetría RAD Exacta -->
+        <div class="fila-dato-ruta">
+          <span class="icono-blanco">🕒</span>
+          <span>
+            ETA: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong>
+            | 3. RAD: <strong style="color: #fbbf24;">{{ datosMision.dosis_uSv_h }} µSv/h (Escudo {{ datosMision.blindaje_pct }}%)</strong>
+          </span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
 </div>

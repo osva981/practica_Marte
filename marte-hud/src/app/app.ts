@@ -10,917 +10,890 @@ import * as THREE from 'three';
   styleUrls: ['./app.css']
 })
 export class App implements OnInit, AfterViewInit, OnDestroy {
-  usarCapaMola: boolean = false;
+  hostBackend: string = 'localhost';
+
   intensidadTormenta: number = 12;
-  nodoActualId: string = 'N1';
+  nodoActualId: string = 'N0';
   caminataActiva: boolean = true;
-  tormentaProgresivaActiva: boolean = false;
+  vistaPrimeraPersona: boolean = false;
   datosMision: any = null;
 
-  // Controles de velocidad y cámara para que la vista derecha sea 100% ajustable y dinámica
-  velocidadSimulacion: number = 2.5; // Multiplicador de velocidad (1x, 2.5x, 5x)
-  modoVistaDerecha: 'SEGUIMIENTO' | 'PRIMERA_PERSONA' = 'SEGUIMIENTO';
-  nivelZoomDerecha: number = 100; // Porcentaje indicador de zoom
+  // Coordenada continua del astronauta que NUNCA se reinicia al cambiar la radiación
+  posAstroSvg = { x: 34, y: 126 };
+  indiceWaypointObjetivo: number = 1;
+  angulosCasco = { rumboGrados: 90, inclinacionGrados: 2.1 };
 
-  progresoSegmento: number = 0;
-  posVector3D = { x: 0, y: 0, z: 0 };
-  vectorTangenteHUD = { tx: 0, ty: 0, tz: 0 };
-  vectorEscapeBase = { vx: 0, vz: 0, distM: 0 };
-  angulosCasco = { rumboGrados: 115, inclinacionGrados: 3.5 };
-
-  private scene!: THREE.Scene;
-  private cameraBase!: THREE.PerspectiveCamera;
-  private cameraHud!: THREE.PerspectiveCamera;
-  private rendererBase!: THREE.WebGLRenderer;
-  private rendererHud!: THREE.WebGLRenderer;
-
-  private terrenoMesh!: THREE.Mesh;
-  private texturaCuriosity!: THREE.Texture;
-  private texturaMola!: THREE.Texture;
-
-  private grupoGrafoOrbital!: THREE.Group;
-  private grupoVectoresOrbital!: THREE.Group;
-  private grupoMarcadoresHud!: THREE.Group;
-  private grupoOndaCalor!: THREE.Group;
-  private anillosPulsoCalor: THREE.Line[] = [];
-  private balizasCaminoHud: THREE.Mesh[] = [];
-
-  private rutaTuboMesh!: THREE.Mesh;
-  private rutaHudMesh!: THREE.Mesh;
-
-  private astronautaMesh!: THREE.Group;
+  // ESCENA 1 (IZQUIERDA): Superficie con Astronauta 3D Articulado + Flecha Verde + Cinta Azul
+  private sceneMini!: THREE.Scene;
+  private cameraMini!: THREE.PerspectiveCamera;
+  private rendererMini!: THREE.WebGLRenderer;
+  private actorSuperficieGroup!: THREE.Group;
   private piernaIzq!: THREE.Mesh;
   private piernaDer!: THREE.Mesh;
   private brazoIzq!: THREE.Mesh;
   private brazoDer!: THREE.Mesh;
-  private flechaTangenteAstro!: THREE.ArrowHelper;
+  private grupoRutaMini!: THREE.Group;
+  private grupoOndaMini!: THREE.Group;
 
-  private tangenteSuave = new THREE.Vector3(1, 0, 0);
+  // ESCENA 2 (DERECHA): Mapa MOLA de Cráteres, Nodos y Salida de Escape
+  private sceneMapaNodos!: THREE.Scene;
+  private cameraMapaNodos!: THREE.PerspectiveCamera;
+  private rendererMapaNodos!: THREE.WebGLRenderer;
+  private grupoGrafoCompleto!: THREE.Group;
+  private grupoCrateresRojos!: THREE.Group;
+  private grupoOndaDerecha!: THREE.Group;
+  private marcadorAstronautaDerecha!: THREE.Group;
 
   private animFrameId: any;
-  private intervaloTormenta: any;
   private reloj = new THREE.Clock();
+  private tangenteSuave = new THREE.Vector3(1, 0, 0);
 
-  // Controles de cámara Izquierda (Monitor Base)
-  private arrastrandoBase = false;
-  private mousePrevBase = { x: 0, y: 0 };
-  private anguloOrbitaBase = { theta: 0.16, phi: 0.72, radio: 145 };
-  private centroOrbitaBase = new THREE.Vector3(2, 0, 6);
+  private arrastrandoMini = false;
+  private arrastrandoDerecha = false;
+  private mousePrev = { x: 0, y: 0 };
+  private yawMiniOffset = 0;
+  private pitchMiniOffset = 0.38;
+  private distMini = 10.5;
 
-  // Controles interactivos de cámara Derecha (Visor Casco / Seguimiento 3D)
-  private arrastrandoHud = false;
-  private mousePrevHud = { x: 0, y: 0 };
-  private hudOrbita = {
-    yawOffset: 0.0,     // Giro horizontal manual con el mouse
-    pitchOffset: 0.32,  // Inclinación vertical manual con el mouse
-    distancia: 6.5,     // Zoom de distancia (0 = 1ra persona, 2..28 = seguimiento 3D)
-    fov: 60             // Zoom óptico del lente
-  };
+  private orbitaDerecha = { theta: 0.0, phi: 0.50, radio: 152 };
 
-  private readonly catalogoNodos: any[] = [
-    { id: 'N0', nombre: 'Base Bradbury / Pahrump', tipo: 'BASE', orden: 0, altitud: -4480, exp: 0.05, svgX: 48, svgY: 118 },
-    { id: 'N1', nombre: 'Planicie Yellowknife', tipo: 'RUTA', orden: 1, altitud: -4472, exp: 0.95, svgX: 68, svgY: 134 },
-    { id: 'N2', nombre: 'Borde Dunas Bagnold', tipo: 'RUTA', orden: 2, altitud: -4460, exp: 1.55, svgX: 88, svgY: 150 },
-    { id: 'N3', nombre: 'Corredor Dunas Oscuras', tipo: 'RUTA', orden: 3, altitud: -4445, exp: 1.95, svgX: 110, svgY: 166 },
-    { id: 'N4', nombre: 'Entrada Murray Buttes', tipo: 'RUTA', orden: 4, altitud: -4422, exp: 2.20, svgX: 134, svgY: 182 },
-    { id: 'N5', nombre: 'Paso Hematita Oeste', tipo: 'RUTA', orden: 5, altitud: -4395, exp: 2.35, svgX: 158, svgY: 196 },
-    { id: 'N6', nombre: 'Curva Sur Vera Rubin', tipo: 'RUTA', orden: 6, altitud: -4360, exp: 2.45, svgX: 184, svgY: 208 },
-    { id: 'N7', nombre: 'Cresta Vera Rubin', tipo: 'RUTA', orden: 7, altitud: -4325, exp: 2.50, svgX: 210, svgY: 214 },
-    { id: 'N8', nombre: 'Rampa Glen Torridon', tipo: 'RUTA', orden: 8, altitud: -4285, exp: 2.35, svgX: 236, svgY: 210 },
-    { id: 'N9', nombre: 'Cuenca Arcillas', tipo: 'RUTA', orden: 9, altitud: -4240, exp: 2.10, svgX: 260, svgY: 200 },
-    { id: 'N10', nombre: 'Base Unidad Sulfatos', tipo: 'RUTA', orden: 10, altitud: -4185, exp: 1.95, svgX: 280, svgY: 186 },
-    { id: 'N11', nombre: 'Espolón Central', tipo: 'RUTA', orden: 11, altitud: -4125, exp: 1.80, svgX: 298, svgY: 170 },
-    { id: 'N12', nombre: 'Boca Gediz Vallis', tipo: 'RUTA', orden: 12, altitud: -4065, exp: 1.60, svgX: 314, svgY: 154 },
-    { id: 'N13', nombre: 'Cañón Superior Gediz', tipo: 'RUTA', orden: 13, altitud: -4005, exp: 1.40, svgX: 328, svgY: 138 },
-    { id: 'N14', nombre: 'Cresta Pedimento', tipo: 'RUTA', orden: 14, altitud: -3950, exp: 1.20, svgX: 342, svgY: 122 },
-    { id: 'N15', nombre: 'Estación Cima Monte Sharp', tipo: 'CIMA', orden: 15, altitud: -3890, exp: 0.15, svgX: 356, svgY: 106 },
-
-    { id: 'S1', nombre: 'Cañón Lateral Pahrump', tipo: 'REFUGIO', orden: 3, altitud: -4455, exp: 0.08, svgX: 114, svgY: 104 },
-    { id: 'S2', nombre: 'Paso Bajo Roca Murray', tipo: 'REFUGIO', orden: 6, altitud: -4405, exp: 0.08, svgX: 172, svgY: 98 },
-    { id: 'S3', nombre: 'Túnel Natural Vera Rubin', tipo: 'REFUGIO', orden: 9, altitud: -4335, exp: 0.08, svgX: 232, svgY: 102 },
-    { id: 'S4', nombre: 'Búnker Rocoso Gediz', tipo: 'REFUGIO', orden: 12, altitud: -4055, exp: 0.08, svgX: 288, svgY: 110 }
+  // Los 6 Cráteres reales del escaneo MOLA (Unidades de Impacto USGS AHi)
+  private crateresDetectados: any[] = [
+    { id: 'CR_1', svgX: 86, svgY: 74, radio: 24, profundidad_m: 950 },
+    { id: 'CR_2', svgX: 168, svgY: 118, radio: 29, profundidad_m: 1250 },
+    { id: 'CR_3', svgX: 265, svgY: 86, radio: 27, profundidad_m: 1100 },
+    { id: 'CR_4', svgX: 118, svgY: 176, radio: 22, profundidad_m: 820 },
+    { id: 'CR_5', svgX: 222, svgY: 184, radio: 24, profundidad_m: 940 },
+    { id: 'CR_6', svgX: 326, svgY: 154, radio: 26, profundidad_m: 1050 }
   ];
 
-  private readonly paresAristas: [string, string][] = [
-    ['N0','N1'],['N1','N2'],['N2','N3'],['N3','N4'],['N4','N5'],['N5','N6'],['N6','N7'],['N7','N8'],
-    ['N8','N9'],['N9','N10'],['N10','N11'],['N11','N12'],['N12','N13'],['N13','N14'],['N14','N15'],
-    ['N1','S1'],['S1','S2'],['S2','S3'],['S3','S4'],['S4','N13'],
-    ['N2','S1'],['N3','S1'],['N4','S2'],['N5','S2'],['N6','S2'],
-    ['N7','S3'],['N8','S3'],['N9','S3'],['N10','S4'],['N11','S4'],['N12','S4']
+  // Nodos del Valle Central (Con datos exactos MOLA y USGS SIM 3292)
+  private readonly nodosValleCentral = [
+    { id: 'N0', svgX: 32, svgY: 126, terreno: 'VALLE_CENTRAL', codigo_usgs: 'Hto', unidad: 'Canal de Salida (Hto)', blindaje: 75, alt: -3242.4 },
+    { id: 'C1', svgX: 78, svgY: 128, terreno: 'VALLE_CENTRAL', codigo_usgs: 'Hto', unidad: 'Canal Fluvial (Hto)', blindaje: 78, alt: -3236.8 },
+    { id: 'C2', svgX: 122, svgY: 122, terreno: 'VALLE_CENTRAL', codigo_usgs: 'HNt', unidad: 'Transición Noeica (HNt)', blindaje: 45, alt: -3231.2 },
+    { id: 'C3', svgX: 168, svgY: 160, terreno: 'VALLE_CENTRAL', codigo_usgs: 'HNt', unidad: 'Paso Inter-Cráter (HNt)', blindaje: 35, alt: -3226.5 },
+    { id: 'C4', svgX: 216, svgY: 138, terreno: 'VALLE_CENTRAL', codigo_usgs: 'Hto', unidad: 'Cuenca Fluvial (Hto)', blindaje: 65, alt: -3221.0 },
+    { id: 'C5', svgX: 268, svgY: 134, terreno: 'VALLE_CENTRAL', codigo_usgs: 'Hto', unidad: 'Valle Central (Hto)', blindaje: 70, alt: -3215.6 },
+    { id: 'C6', svgX: 318, svgY: 112, terreno: 'VALLE_CENTRAL', codigo_usgs: 'lHv', unidad: 'Planicie Basáltica (lHv)', blindaje: 50, alt: -3210.1 },
+    { id: 'META', svgX: 368, svgY: 122, terreno: 'OBJETIVO_META', codigo_usgs: 'lHv', unidad: 'Afloramiento Boxwork (lHv)', blindaje: 85, alt: -3204.8 }
   ];
+
+  // Nodos del Corredor Seguro Superior (Unidad Volcánica Firme USGS lHv fuera del alcance solar)
+  private readonly nodosCorredorSeguro = [
+    { id: 'S1', svgX: 72, svgY: 68, terreno: 'RUTA_SEGURA', codigo_usgs: 'lHv', unidad: 'Planicie Volcánica (lHv)', blindaje: 88, alt: -3218.5 },
+    { id: 'S2', svgX: 128, svgY: 72, terreno: 'RUTA_SEGURA', codigo_usgs: 'lHv', unidad: 'Flujo Basáltico Firme (lHv)', blindaje: 90, alt: -3214.2 },
+    { id: 'S3', svgX: 175, svgY: 74, terreno: 'RUTA_SEGURA', codigo_usgs: 'lHv', unidad: 'Cresta Volcánica (lHv)', blindaje: 86, alt: -3210.7 },
+    { id: 'S4', svgX: 218, svgY: 68, terreno: 'RUTA_SEGURA', codigo_usgs: 'lHv', unidad: 'Corredor Protegido (lHv)', blindaje: 92, alt: -3208.3 },
+    { id: 'S5', svgX: 265, svgY: 46, terreno: 'RUTA_SEGURA', codigo_usgs: 'lHv', unidad: 'Arco Boreal Seguro (lHv)', blindaje: 94, alt: -3204.0 },
+    { id: 'S6', svgX: 316, svgY: 78, terreno: 'RUTA_SEGURA', codigo_usgs: 'lHv', unidad: 'Rampa Basáltica (lHv)', blindaje: 89, alt: -3206.5 }
+  ];
+
+  private catalogoNodos: any[] = [];
+  private paresAristas: [string, string][] = [];
+  private nodosEscapeDinamicos: any[] = [];
+  private escapeActivo = false;
 
   constructor(private cdr: ChangeDetectorRef) {
-    this.datosMision = this.calcularRutaOrdenada(this.nodoActualId, this.intensidadTormenta);
+    if (typeof window !== 'undefined') {
+      this.hostBackend = window.location.hostname || 'localhost';
+    }
+    this.construirRedCompleta();
+    this.datosMision = this.recalcularRutaSinReiniciarAstronauta();
   }
 
   ngOnInit() {
-    this.actualizarRutaYTelemetria();
+    this.actualizarSistema();
   }
 
   ngAfterViewInit() {
     setTimeout(() => {
-      this.inicializarMotor3D();
-      this.animarSimulacion3D();
+      this.inicializarVisoresDuales();
+      this.animarSimulacionContinua();
+      window.addEventListener('resize', () => this.redimensionarVisores());
     }, 100);
   }
 
   ngOnDestroy() {
-    if (this.intervaloTormenta) clearInterval(this.intervaloTormenta);
     if (this.animFrameId) cancelAnimationFrame(this.animFrameId);
   }
 
-  private obtenerParametrosOndaCalor(rad: number) {
-    const factor = Math.max(0, (rad - 10) / 80);
-    const epicentroSvgX = 105 + factor * 18;
-    const epicentroSvgY = 238 - factor * 24;
-    const radioExteriorSvg = 24 + factor * 54;
-    return { factor, epicentroSvgX, epicentroSvgY, radioExteriorSvg };
-  }
-
-  actualizarRutaYTelemetria() {
-    this.datosMision = this.calcularRutaOrdenada(this.nodoActualId, this.intensidadTormenta);
-    this.reconstruirGrafoYRuta3D();
-    this.cdr.detectChanges();
-
-    fetch(`http://localhost:8080/api/telemetria-marte?intensidad_tormenta=${this.intensidadTormenta}&nodo_actual=${this.nodoActualId}`)
-      .catch(() => {});
-  }
-
-  calcularRutaOrdenada(inicioId: string, rad: number) {
-    const mapaNodos = new Map<string, any>();
-    this.catalogoNodos.forEach(n => mapaNodos.set(n.id, n));
-    if (!mapaNodos.has(inicioId)) inicioId = 'N1';
-
-    const onda = this.obtenerParametrosOndaCalor(rad);
-
-    const buscarDijkstra = (orig: string, dest: string, modo: 'NORMAL' | 'DESVIO' | 'REGRESO') => {
-      if (orig === dest) {
-        const unico = mapaNodos.get(orig);
-        return [{ ...unico, pendiente: 0, rad_nodo: Math.round((9.5 + rad * unico.exp) * 10) / 10 }];
+  private aristaTocaCrater(x1: number, y1: number, x2: number, y2: number): boolean {
+    for (const c of this.crateresDetectados) {
+      for (let s = 0; s <= 20; s++) {
+        const t = s / 20.0;
+        const px = x1 + t * (x2 - x1);
+        const py = y1 + t * (y2 - y1);
+        if (Math.hypot(px - c.svgX, py - c.svgY) < c.radio * 1.12) {
+          return true;
+        }
       }
+    }
+    return false;
+  }
 
-      const costos = new Map<string, number>();
-      const previos = new Map<string, string | null>();
-      const visitados = new Set<string>();
+  // Empuja cualquier coordenada fuera del interior de los 6 cráteres
+  private asegurarPuntoFueraDeCrateres(x: number, y: number): { x: number; y: number } {
+    let rx = x;
+    let ry = y;
+    for (const c of this.crateresDetectados) {
+      const dist = Math.hypot(rx - c.svgX, ry - c.svgY);
+      const minSeg = c.radio * 1.28;
+      if (dist < minSeg) {
+        const ang = Math.atan2(ry - c.svgY, rx - c.svgX);
+        rx = c.svgX + Math.cos(ang) * minSeg;
+        ry = c.svgY + Math.sin(ang) * minSeg;
+      }
+    }
+    return { x: Math.max(24, Math.min(372, rx)), y: Math.max(36, Math.min(220, ry)) };
+  }
 
-      this.catalogoNodos.forEach(n => {
-        costos.set(n.id, Infinity);
-        previos.set(n.id, null);
-      });
-      costos.set(orig, 0);
+  private construirRedCompleta() {
+    this.catalogoNodos = [...this.nodosValleCentral, ...this.nodosCorredorSeguro, ...this.nodosEscapeDinamicos];
 
-      while (visitados.size < this.catalogoNodos.length) {
-        let u: string | null = null;
-        let minC = Infinity;
-        costos.forEach((c, id) => {
-          if (!visitados.has(id) && c < minC) {
-            minC = c;
-            u = id;
+    for (const cr of this.crateresDetectados) {
+      const puntos = 8;
+      const radioSeg = cr.radio * 1.35;
+      for (let k = 0; k < puntos; k++) {
+        const ang = (k / puntos) * Math.PI * 2.0;
+        const rx = Math.max(24, Math.min(376, Math.round(cr.svgX + Math.cos(ang) * radioSeg)));
+        const ry = Math.max(38, Math.min(220, Math.round(cr.svgY + Math.sin(ang) * radioSeg)));
+        let libre = true;
+        for (const otro of this.crateresDetectados) {
+          if (otro.id !== cr.id && Math.hypot(rx - otro.svgX, ry - otro.svgY) < otro.radio * 1.18) {
+            libre = false;
+            break;
           }
-        });
-        if (!u || u === dest) break;
-        visitados.add(u);
+        }
+        if (libre) {
+          this.catalogoNodos.push({
+            id: `${cr.id}_R${k}`,
+            svgX: rx,
+            svgY: ry,
+            terreno: 'FALDA_CRATER',
+            codigo_usgs: 'AHi/lHv',
+            unidad: 'Contorno Cráter (lHv)',
+            blindaje: 60,
+            alt: -3225.0,
+            emergencia: false
+          });
+        }
+      }
+    }
 
-        const nodoU = mapaNodos.get(u);
-        for (const [a, b] of this.paresAristas) {
-          const v = a === u ? b : b === u ? a : null;
-          if (!v || visitados.has(v)) continue;
-          const nodoV = mapaNodos.get(v);
+    this.paresAristas = [];
+    for (let i = 0; i < this.catalogoNodos.length; i++) {
+      const a = this.catalogoNodos[i];
+      for (let j = i + 1; j < this.catalogoNodos.length; j++) {
+        const b = this.catalogoNodos[j];
+        if (Math.hypot(a.svgX - b.svgX, a.svgY - b.svgY) <= 68 && !this.aristaTocaCrater(a.svgX, a.svgY, b.svgX, b.svgY)) {
+          this.paresAristas.push([a.id, b.id]);
+        }
+      }
+    }
+  }
 
-          const dist = Math.hypot(nodoV.svgX - nodoU.svgX, nodoV.svgY - nodoU.svgY);
-          const distAOndaCalor = Math.hypot(nodoV.svgX - onda.epicentroSvgX, nodoV.svgY - onda.epicentroSvgY);
-          let penalizacion = 0;
+  /**
+   * RECALCULA LA RUTA DESDE LA POSICIÓN EXACTA ACTUAL DEL ASTRONAUTA (SIN REINICIARLO NUNCA):
+   * - Si la radiación sube (o se acerca al astronauta), crea los nodos ★ ESC_1 y ★ ESC_2 justo frente a él hacia la ruta segura.
+   * - Si la radiación baja, retoma los nodos del Valle Central que están adelante de su coordenada X actual.
+   */
+  recalcularRutaSinReiniciarAstronauta() {
+    const rad = this.intensidadTormenta;
+    const factorOnda = Math.max(0, (rad - 10) / 80);
+    const epicentroX = 185;
+    const epicentroY = 228 - factorOnda * 65;
+    const radioOnda = 26 + factorOnda * 68;
 
-          if (modo === 'NORMAL') {
-            if (nodoV.tipo === 'REFUGIO') penalizacion += 140;
-            if (nodoV.orden < nodoU.orden) penalizacion += 500;
-          } else if (modo === 'DESVIO') {
-            if (distAOndaCalor < onda.radioExteriorSvg + 32 && nodoV.tipo !== 'REFUGIO') {
-              penalizacion += 950;
-            }
-            if (nodoV.exp > 1.0) penalizacion += nodoV.exp * 450;
-            if (nodoV.orden < nodoU.orden) penalizacion += 400;
-          } else if (modo === 'REGRESO') {
-            if (nodoV.orden > nodoU.orden) penalizacion += 600;
-          }
+    const ax = this.posAstroSvg.x;
+    const ay = this.posAstroSvg.y;
+    const distAstroAOnda = Math.hypot(ax - epicentroX, ay - epicentroY);
 
-          const nuevoCosto = costos.get(u)! + dist + penalizacion;
-          if (nuevoCosto < costos.get(v)!) {
-            costos.set(v, nuevoCosto);
-            previos.set(v, u);
-          }
+    // Activa o desactiva la ruta de escape según el nivel de radiación actual, PERO respetando donde está parado el astronauta
+    const requiereEscape = rad >= 26 || distAstroAOnda < radioOnda + 34;
+
+    let waypointsAdelante: any[] = [];
+    let codigoAccion = 'AVANZAR';
+    let mensajeHud = '✅ RUTA VALLE CENTRAL: Avanzando entre cráteres a 0.62 m/s';
+
+    // Punto 0 de la ruta activa: SIEMPRE es la posición exacta donde está el astronauta en este instante
+    const nodoPosicionActual = {
+      id: this.nodoActualId,
+      svgX: ax,
+      svgY: ay,
+      terreno: requiereEscape ? 'SALIDA_EMERGENCIA' : 'VALLE_CENTRAL',
+      codigo_usgs: ay < 95 ? 'lHv' : 'Hto',
+      unidad: ay < 95 ? 'Planicie Volcánica (lHv)' : 'Canal Fluvial (Hto)',
+      blindaje: ay < 95 ? 90 : 72,
+      alt: Math.round((-3242 + (ax / 368) * 38) * 10) / 10,
+      emergencia: requiereEscape
+    };
+
+    if (!requiereEscape) {
+      this.escapeActivo = false;
+      this.nodosEscapeDinamicos = [];
+      this.construirRedCompleta();
+
+      // Toma únicamente los nodos del Valle Central que están ADELANTE de la posición X actual del astronauta
+      waypointsAdelante = this.nodosValleCentral.filter(n => n.svgX > ax + 12);
+      if (waypointsAdelante.length === 0) {
+        waypointsAdelante = [this.nodosValleCentral[this.nodosValleCentral.length - 1]];
+      }
+    } else {
+      this.escapeActivo = true;
+      codigoAccion = 'DESVIO';
+      mensajeHud = '🚨 RADIACIÓN EN ALCANCE: Salida rápida [★ ESC_1 ➔ ESC_2] activa desde posición actual';
+
+      // Crea el nodo de escape ★ ESC_1 en la posición actual y ★ ESC_2 saliendo hacia el corredor seguro superior
+      const pEsc1 = this.asegurarPuntoFueraDeCrateres(ax, ay);
+      let pEsc2 = this.asegurarPuntoFueraDeCrateres(Math.min(340, ax + 26), Math.min(76, ay - 36));
+      for (const c of this.crateresDetectados) {
+        if (Math.hypot(pEsc2.x - c.svgX, pEsc2.y - c.svgY) < c.radio * 1.32) {
+          pEsc2 = { x: c.svgX < 150 ? 128 : c.svgX < 230 ? 218 : 316, y: 70 };
         }
       }
 
-      const ruta: any[] = [];
-      let paso: string | null = dest;
-      while (paso) {
-        const n = mapaNodos.get(paso);
-        ruta.unshift({
-          ...n,
-          pendiente: 4.5,
-          rad_nodo: Math.round((9.5 + rad * n.exp) * 10) / 10
-        });
-        paso = previos.get(paso) || null;
-      }
-      return ruta;
-    };
+      const esc1 = {
+        id: 'ESC_1', svgX: Math.round(pEsc1.x), svgY: Math.round(pEsc1.y),
+        terreno: 'SALIDA_EMERGENCIA', codigo_usgs: 'lHv', unidad: 'Salida Escape (USGS lHv)', blindaje: 88, alt: -3224.0, emergencia: true
+      };
+      const esc2 = {
+        id: 'ESC_2', svgX: Math.round(pEsc2.x), svgY: Math.round(pEsc2.y),
+        terreno: 'SALIDA_EMERGENCIA', codigo_usgs: 'lHv', unidad: 'Puente Seguro (USGS lHv)', blindaje: 92, alt: -3214.5, emergencia: true
+      };
 
-    let codigoAccion = 'AVANZAR';
-    let decisionTactica = 'CLIMA ESPACIAL ÓPTIMO: ASCENDIENDO POR VECTORES INICIALES CURIOSITY';
-    let rutaElegida: any[] = [];
+      this.nodosEscapeDinamicos = [esc1, esc2];
+      this.construirRedCompleta();
 
-    if (rad >= 60) {
-      codigoAccion = 'REGRESAR';
-      if (inicioId === 'N0') {
-        decisionTactica = '🛡️ ASTRONAUTA EN BASE BRADBURY (N0): FUERA DEL ALCANCE DE LA ONDA DE CALOR';
-      } else {
-        decisionTactica = '🛑 ONDA DE CALOR EXPANDIÉNDOSE: INVIRTIENDO VECTORES DE REGRESO A BASE (N0)';
-      }
-      rutaElegida = buscarDijkstra(inicioId, 'N0', 'REGRESO');
-    } else if (rad >= 44) {
-      codigoAccion = 'REFUGIO';
-      const nodoAct = mapaNodos.get(inicioId);
-      const refugioMeta = nodoAct.orden <= 4 ? 'S1' : nodoAct.orden <= 7 ? 'S2' : nodoAct.orden <= 10 ? 'S3' : 'S4';
-      if (inicioId === refugioMeta) {
-        decisionTactica = `🛡️ RESGUARDADO EN ${nodoAct.nombre.toUpperCase()}: LEJOS DEL FRENTE DE CALOR`;
-      } else {
-        decisionTactica = `🚨 FRENTE TÉRMICO CERCANO: EVACUANDO VECTORES INICIALES HACIA REFUGIO (${refugioMeta})`;
-      }
-      rutaElegida = buscarDijkstra(inicioId, refugioMeta, 'DESVIO');
-    } else if (rad >= 18) {
-      codigoAccion = 'DESVIO';
-      decisionTactica = '⚠️ ONDA DE CALOR ACERCÁNDOSE A VECTORES INICIALES: DESVIANDO A CORREDOR SEGURO (S1 ➔ S4)';
-      rutaElegida = buscarDijkstra(inicioId, 'N15', 'DESVIO');
-    } else {
-      codigoAccion = 'AVANZAR';
-      rutaElegida = buscarDijkstra(inicioId, 'N15', 'NORMAL');
+      const segurosAdelante = this.nodosCorredorSeguro.filter(s => s.svgX > esc2.svgX + 8);
+      const nodoMeta = this.nodosValleCentral[this.nodosValleCentral.length - 1];
+      waypointsAdelante = [esc2, ...segurosAdelante, nodoMeta];
     }
 
-    let distTotal = 0;
-    let desnivelPos = 0;
-    for (let i = 0; i < rutaElegida.length - 1; i++) {
-      const a = rutaElegida[i];
-      const b = rutaElegida[i + 1];
-      const d = Math.hypot(b.svgX - a.svgX, b.svgY - a.svgY) * 8.0;
-      const dh = Math.abs(b.altitud - a.altitud);
-      distTotal += d;
-      if (b.altitud > a.altitud) desnivelPos += dh;
-      a.pendiente = Math.round(Math.atan2(dh, Math.max(1, d)) * (180 / Math.PI) * 10) / 10;
-    }
+    const rutaCompletaDesdeAstro = [nodoPosicionActual, ...waypointsAdelante];
+    this.indiceWaypointObjetivo = 1;
 
-    const enDestinoSeguro = rutaElegida.length <= 1;
-    const velReal = enDestinoSeguro ? 0.0 : rad >= 18 ? 1.32 : 1.05;
-    const tiempoLlegadaSeg = enDestinoSeguro ? 0 : Math.max(25, Math.round(distTotal / velReal));
-    const distanciaFrenteM = Math.max(120, 1750 - rad * 16.5);
-    const velFrente = 0.65 + rad * 0.025;
-    const tiempoImpactoSeg = Math.round(distanciaFrenteM / velFrente);
+    return this.generarTelemetriaExacta(rutaCompletaDesdeAstro, codigoAccion, mensajeHud);
+  }
 
-    const nodoActObj = rutaElegida[0];
-    const nodoBaseObj = mapaNodos.get('N0');
-    const dxBase = nodoBaseObj.svgX - nodoActObj.svgX;
-    const dyBase = nodoBaseObj.svgY - nodoActObj.svgY;
-    const magBase = Math.max(1, Math.hypot(dxBase, dyBase));
-    this.vectorEscapeBase = {
-      vx: Math.round((dxBase / magBase) * 100) / 100,
-      vz: Math.round((dyBase / magBase) * 100) / 100,
-      distM: inicioId === 'N0' ? 0 : Math.round(magBase * 8.0)
-    };
+  // Calcula con precisión científica las Instrucciones al Astronauta y las 3 Capas NASA en cada frame
+  private generarTelemetriaExacta(rutaActiva: any[], codigoAccion: string, mensajeHud: string) {
+    const rad = this.intensidadTormenta;
+    const sigNodo = rutaActiva[Math.min(rutaActiva.length - 1, this.indiceWaypointObjetivo)] || rutaActiva[rutaActiva.length - 1];
+
+    // 1. Distancia real restante y rumbo vectorial al siguiente punto
+    const dxSig = sigNodo.svgX - this.posAstroSvg.x;
+    const dySig = sigNodo.svgY - this.posAstroSvg.y;
+    const distTramoM = Math.max(1.2, Math.round(Math.hypot(dxSig, dySig) * 0.86 * 10) / 10);
+    const distMetaM = Math.max(2.0, Math.round(Math.hypot(368 - this.posAstroSvg.x, 122 - this.posAstroSvg.y) * 0.86 * 100) / 100);
+
+    const rumboRad = Math.atan2(dxSig, -dySig);
+    const rumboGrados = Math.round(((rumboRad * 180) / Math.PI + 360) % 360);
+    const puntosCardinales = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
+    const cardinal = puntosCardinales[Math.round(rumboGrados / 22.5) % 16];
+
+    // 2. CAPA 1 — Topografía MOLA Exacta (Altitud y Pendiente en grados)
+    const x3D = (this.posAstroSvg.x - 200) * 0.5;
+    const z3D = (this.posAstroSvg.y - 125) * 0.5;
+    const elevLocal = this.calcularElevacionMarteMOLA(x3D, z3D);
+    const elevAdelante = this.calcularElevacionMarteMOLA(x3D + (dxSig / Math.max(1, Math.hypot(dxSig, dySig))), z3D + (dySig / Math.max(1, Math.hypot(dxSig, dySig))));
+    const altitudMolaM = Math.round((-3242.0 + (this.posAstroSvg.x / 368.0) * 37.5 + elevLocal * 1.4) * 10) / 10;
+    const pendienteGrados = Math.round(Math.atan2(elevAdelante - elevLocal, 1.0) * (180 / Math.PI) * 10) / 10;
+
+    // 3. CAPA 2 — Geología USGS SIM 3292 (Unidad y Velocidad ajustada)
+    const enZonaNorte = this.posAstroSvg.y < 96;
+    const codigoUsgs = enZonaNorte ? 'lHv' : 'Hto';
+    const nombreUnidadUsgs = enZonaNorte ? 'Unidad Volcánica Firme (lHv)' : 'Canal Fluvial de Salida (Hto)';
+    const blindajeNaturalPct = enZonaNorte ? 90 : 74;
+    const velRealMS = Math.round(0.62 * Math.exp(-0.025 * Math.abs(pendienteGrados)) * (enZonaNorte ? 1.03 : 1.0) * 100) / 100;
+
+    // 4. CAPA 3 — Dosimetría RAD y Clima Atmosférico MEDA
+    const factorOnda = Math.max(0, (rad - 10) / 80);
+    const epicentroX = 185;
+    const epicentroY = 228 - factorOnda * 65;
+    const distFrenteSvg = Math.max(8, Math.hypot(this.posAstroSvg.x - epicentroX, this.posAstroSvg.y - epicentroY));
+    const factorProximidad = Math.exp(-Math.pow(distFrenteSvg / 95.0, 2));
+    const atenuacionTerreno = 1.0 - (blindajeNaturalPct / 140.0);
+    const dosisExactaUSv = Math.round((9.5 + rad * 1.35 * factorProximidad * atenuacionTerreno) * 10) / 10;
+
+    const tempAmbienteC = Math.round((-54.0 - (rad - 12) * 0.12 + Math.sin(this.posAstroSvg.x * 0.05) * 1.5) * 10) / 10;
+    const vientoKmh = Math.round(18 + (rad - 10) * 0.65);
+    const presionHpa = Math.round((7.35 - (altitudMolaM + 3240) * 0.004) * 100) / 100;
+
+    // 5. INSTRUCCIONES TÁCTICAS EN VIVO PARA QUE EL ASTRONAUTA AVANCE AL SIGUIENTE NODO
+    const instRumbo = `Dirigirse a ${rumboGrados}° ${cardinal} por ${distTramoM} m (Inclinación rampa: ${pendienteGrados > 0 ? '+' : ''}${pendienteGrados}°).`;
+    const instTerreno = enZonaNorte
+      ? `Pisar sobre basalto solidificado (${codigoUsgs}); mantener tracción a ${velRealMS} m/s lejos del borde de cráter.`
+      : `Avanzar por lecho sedimentario (${codigoUsgs}) a ${velRealMS} m/s aprovechando las paredes del canal.`;
+    const instClima = this.escapeActivo
+      ? `Frente solar a ${Math.round(distFrenteSvg * 0.86)} m al sur: seguir puente de salida [★ ESC] con ${blindajeNaturalPct}% de blindaje.`
+      : `Clima nominal (${dosisExactaUSv} µSv/h): continuar por el Valle Central vigilando actividad solar.`;
+
+    const etaSeg = Math.round((distMetaM / velRealMS) * 10.1);
 
     return {
-      sol_mision: 145,
-      nodo_actual_id: rutaElegida[0].id,
-      siguiente_waypoint: rutaElegida.length > 1 ? rutaElegida[1].nombre : 'EN RESGUARDO SEGURO',
-      evaluacion_predictiva: {
-        eta_cima_seg: 920,
-        cima_viable: tiempoImpactoSeg > 920,
-        eta_desvio_seg: 610,
-        desvio_viable: tiempoImpactoSeg > 610,
-        eta_retorno_seg: Math.min(310, tiempoLlegadaSeg),
-        retorno_viable: true
+      nodo_actual_id: this.nodoActualId,
+      siguiente_waypoint: sigNodo.id,
+      altitud_actual_m: altitudMolaM,
+      pendiente_actual_grados: pendienteGrados,
+      codigo_usgs: codigoUsgs,
+      unidad_geologica: nombreUnidadUsgs,
+      blindaje_pct: blindajeNaturalPct,
+      dosis_uSv_h: dosisExactaUSv,
+      clima_meda: {
+        temp_c: tempAmbienteC,
+        viento_kmh: vientoKmh,
+        presion_hpa: presionHpa
       },
+      instrucciones_eva: {
+        paso_rumbo: instRumbo,
+        paso_terreno: instTerreno,
+        paso_clima: instClima
+      },
+      total_nodos_urgencia: this.nodosEscapeDinamicos.length,
       alerta_radiacion: {
-        activa: rad >= 18,
+        activa: this.escapeActivo,
         codigo_accion: codigoAccion,
-        mensaje_hud: decisionTactica,
-        intensidad_tormenta: rad,
-        tiempo_para_impacto_seg: tiempoImpactoSeg,
-        tiempo_llegada_refugio_seg: tiempoLlegadaSeg,
-        margen_supervivencia_seg: tiempoImpactoSeg - tiempoLlegadaSeg
+        mensaje_hud: mensajeHud,
+        tiempo_llegada_refugio_seg: etaSeg
       },
       calculos_fisicos: {
-        distancia_total_m: Math.round(distTotal),
-        desnivel_positivo_m: Math.round(desnivelPos),
-        velocidad_real_m_s: velReal,
-        pendiente_promedio_grados: rutaElegida[0].pendiente || 0,
-        dosis_traje_uSv_h: rutaElegida[0].rad_nodo,
-        dosis_acumulada_uSv: Math.round(rutaElegida[0].rad_nodo * 0.4 * 10) / 10,
-        porcentaje_limite_nasa: Math.min(100, Math.round((rad / 95) * 65)),
-        esfuerzo_metabolico_w: enDestinoSeguro ? 110 : rad >= 18 ? 265 : 235,
-        consumo_o2_l_min: enDestinoSeguro ? 0.65 : 1.95,
-        ritmo_cardiaco_bpm: enDestinoSeguro ? 76 : rad >= 60 ? 136 : rad >= 18 ? 115 : 94,
-        oxigeno_pct: 96
+        distancia_total_m: distMetaM,
+        velocidad_real_m_s: velRealMS
       },
-      ruta_grafo_java: rutaElegida,
+      ruta_grafo_java: rutaActiva,
       todos_nodos: this.catalogoNodos,
-      aristas_mapa: this.paresAristas.map(([id1, id2]) => {
-        const o = mapaNodos.get(id1);
-        const d = mapaNodos.get(id2);
-        return { x1: o.svgX, y1: o.svgY, x2: d.svgX, y2: d.svgY };
-      })
+      aristas_mapa: this.paresAristas
     };
   }
 
-  calcularElevacionMonteSharp(x: number, z: number): number {
-    const rampaMonte = Math.max(0, (x + 80) * 0.20) + Math.max(0, (25 - z) * 0.08);
-    const distCumbre = Math.hypot(x - 68, z + 8);
-    const cumbre = 28 * Math.exp(-(distCumbre * distCumbre) / 3200);
-    const relieveSuave = Math.sin(x * 0.09) * Math.cos(z * 0.09) * 1.4;
-    return rampaMonte + cumbre + relieveSuave - 14;
+  calcularElevacionMarteMOLA(x: number, z: number): number {
+    const svgX = x * 2.0 + 200.0;
+    const svgY = z * 2.0 + 125.0;
+
+    let y = Math.sin(x * 0.06) * Math.cos(z * 0.06) * 0.85;
+    const canalY = 128.0 + 32.0 * Math.sin((svgX / 400.0) * 6.2);
+    const distCanal = Math.abs(svgY - canalY);
+    if (distCanal < 16.0) {
+      y -= (1.0 - Math.pow(distCanal / 16.0, 2)) * 2.1;
+    }
+
+    for (const c of this.crateresDetectados) {
+      const cx = (c.svgX - 200.0) * 0.5;
+      const cz = (c.svgY - 125.0) * 0.5;
+      const r = c.radio * 0.5;
+      const d = Math.hypot(x - cx, z - cz);
+      const prof = (c.profundidad_m / 1000.0) * 7.2;
+
+      if (d < r) {
+        const t = d / r;
+        y -= (1.0 - t * t) * prof;
+      } else if (d < r * 1.22) {
+        const tRim = (d - r) / (r * 0.22);
+        y += Math.sin(tRim * Math.PI) * (prof * 0.25);
+      }
+    }
+    return y;
   }
 
   svgA3D(svgX: number, svgY: number): THREE.Vector3 {
-    const x = (svgX - 200) * 0.5;
-    const z = (svgY - 125) * 0.5;
-    const y = this.calcularElevacionMonteSharp(x, z);
+    const x = (svgX - 200.0) * 0.5;
+    const z = (svgY - 125.0) * 0.5;
+    const y = this.calcularElevacionMarteMOLA(x, z);
     return new THREE.Vector3(x, y, z);
   }
 
-  private generarPuntosPegadosAlTerreno(nodos: any[], elevacionExtra: number): THREE.Vector3[] {
+  private generarPuntosRodeandoCrateres(nodos: any[], alturaExtra: number): THREE.Vector3[] {
     const puntos: THREE.Vector3[] = [];
     for (let i = 0; i < nodos.length - 1; i++) {
       const pA = this.svgA3D(nodos[i].svgX, nodos[i].svgY);
       const pB = this.svgA3D(nodos[i + 1].svgX, nodos[i + 1].svgY);
-      const pasos = 16;
+      const pasos = 20;
       for (let s = 0; s < pasos; s++) {
         const t = s / pasos;
-        const x = THREE.MathUtils.lerp(pA.x, pB.x, t);
-        const z = THREE.MathUtils.lerp(pA.z, pB.z, t);
-        const y = this.calcularElevacionMonteSharp(x, z) + elevacionExtra;
+        let x = THREE.MathUtils.lerp(pA.x, pB.x, t);
+        let z = THREE.MathUtils.lerp(pA.z, pB.z, t);
+
+        for (const c of this.crateresDetectados) {
+          const cx = (c.svgX - 200.0) * 0.5;
+          const cz = (c.svgY - 125.0) * 0.5;
+          const radioSeguridad3D = c.radio * 0.5 * 1.26;
+          const dist = Math.hypot(x - cx, z - cz);
+          if (dist < radioSeguridad3D) {
+            const ang = Math.atan2(z - cz, x - cx);
+            x = cx + Math.cos(ang) * radioSeguridad3D;
+            z = cz + Math.sin(ang) * radioSeguridad3D;
+          }
+        }
+
+        const y = this.calcularElevacionMarteMOLA(x, z) + alturaExtra;
         puntos.push(new THREE.Vector3(x, y, z));
       }
     }
     const ultimo = this.svgA3D(nodos[nodos.length - 1].svgX, nodos[nodos.length - 1].svgY);
-    ultimo.y += elevacionExtra;
+    ultimo.y += alturaExtra;
     puntos.push(ultimo);
     return puntos;
   }
 
-  private crearCapaOndaCalorTerreno(cx: number, cz: number, radioX: number, radioZ: number, colorHex: number, opacidad: number, alturaExtra: number): THREE.Mesh {
-    const geo = new THREE.PlaneGeometry(radioX * 2, radioZ * 2, 28, 28);
-    geo.rotateX(-Math.PI / 2);
-    const pos = geo.attributes['position'];
+  actualizarSistema() {
+    this.datosMision = this.recalcularRutaSinReiniciarAstronauta();
+    this.reconstruirRutasEnAmbosVisores();
+    this.cdr.detectChanges();
 
-    for (let i = 0; i < pos.count; i++) {
-      const lx = pos.getX(i);
-      const lz = pos.getZ(i);
-      const norm = Math.hypot(lx / Math.max(0.1, radioX), lz / Math.max(0.1, radioZ));
-      const factorRecorte = norm > 1.0 ? 1.0 / norm : 1.0;
-      const wx = cx + lx * factorRecorte;
-      const wz = cz + lz * factorRecorte;
-      const wy = this.calcularElevacionMonteSharp(wx, wz) + alturaExtra;
-      pos.setXYZ(i, wx, wy, wz);
-    }
-    geo.computeVertexNormals();
-
-    const mat = new THREE.MeshBasicMaterial({
-      color: colorHex,
-      transparent: true,
-      opacity: opacidad,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-    return new THREE.Mesh(geo, mat);
+    fetch(`http://${this.hostBackend}:8080/api/telemetria-marte?intensidad_tormenta=${this.intensidadTormenta}&nodo_actual=${this.nodoActualId}`).catch(() => {});
   }
 
-  private crearAnilloTermicoTerreno(cx: number, cz: number, radioX: number, radioZ: number, colorHex: number, opacidad: number): THREE.Line {
-    const pts: THREE.Vector3[] = [];
-    const segmentos = 64;
-    for (let i = 0; i <= segmentos; i++) {
-      const ang = (i / segmentos) * Math.PI * 2;
-      const wx = cx + Math.cos(ang) * radioX;
-      const wz = cz + Math.sin(ang) * radioZ;
-      const wy = this.calcularElevacionMonteSharp(wx, wz) + 0.28;
-      pts.push(new THREE.Vector3(wx, wy, wz));
+  private crearTexturaRegolitoMarte(): THREE.CanvasTexture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d')!;
+    const imgData = ctx.createImageData(512, 512);
+    for (let i = 0; i < imgData.data.length; i += 4) {
+      const px = (i / 4) % 512;
+      const py = Math.floor(i / 4 / 512);
+      const variacion = Math.sin(px * 0.08) * Math.cos(py * 0.08) * 14 + (Math.random() - 0.5) * 16;
+      imgData.data[i] = Math.min(255, Math.max(0, 196 + variacion));
+      imgData.data[i + 1] = Math.min(255, Math.max(0, 110 + variacion * 0.7));
+      imgData.data[i + 2] = Math.min(255, Math.max(0, 70 + variacion * 0.5));
+      imgData.data[i + 3] = 255;
     }
-    const geo = new THREE.BufferGeometry().setFromPoints(pts);
-    const mat = new THREE.LineBasicMaterial({ color: colorHex, transparent: true, opacity: opacidad });
-    return new THREE.Line(geo, mat);
+    ctx.putImageData(imgData, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(4, 4);
+    return tex;
   }
 
   private crearEtiquetaSprite(texto: string, colorFondo: string, escala = 1.0): THREE.Sprite {
     const canvas = document.createElement('canvas');
-    canvas.width = 128;
+    canvas.width = 190;
     canvas.height = 64;
     const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = colorFondo;
     ctx.beginPath();
-    ctx.roundRect(14, 10, 100, 44, 10);
+    ctx.roundRect(6, 10, 178, 44, 10);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
     ctx.lineWidth = 3;
     ctx.stroke();
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 26px Segoe UI, sans-serif';
+    ctx.font = 'bold 20px Segoe UI, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(texto, 64, 33);
+    ctx.fillText(texto, 95, 33);
 
     const tex = new THREE.CanvasTexture(canvas);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
-    sprite.scale.set(3.2 * escala, 1.6 * escala, 1);
+    sprite.scale.set(4.5 * escala, 1.55 * escala, 1);
     return sprite;
   }
 
-  private inicializarMotor3D() {
-    const contenedorBase = document.getElementById('canvas-base-3d');
-    const contenedorHud = document.getElementById('canvas-hud-3d');
-    if (!contenedorBase || !contenedorHud) return;
+  private inicializarVisoresDuales() {
+    const divMini = document.getElementById('canvas-mapa-mini');
+    const divDerecha = document.getElementById('canvas-vision-3d');
+    if (!divMini || !divDerecha) return;
 
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x160d08);
-    this.scene.fog = new THREE.FogExp2(0xb8623d, 0.0032);
+    const texturaSuelo = this.crearTexturaRegolitoMarte();
 
-    this.scene.add(new THREE.AmbientLight(0xffd8c0, 0.9));
-    const sol = new THREE.DirectionalLight(0xfff3e6, 1.65);
-    sol.position.set(85, 140, -65);
-    this.scene.add(sol);
+    const crearMallaTerrenoMOLA = () => {
+      const geo = new THREE.PlaneGeometry(200, 125, 220, 140);
+      geo.rotateX(-Math.PI / 2);
+      const pos = geo.attributes['position'];
+      for (let i = 0; i < pos.count; i++) {
+        pos.setY(i, this.calcularElevacionMarteMOLA(pos.getX(i), pos.getZ(i)));
+      }
+      geo.computeVertexNormals();
+      return geo;
+    };
 
-    const loader = new THREE.TextureLoader();
-    this.texturaCuriosity = loader.load('mapa_monte_sharp.jpg');
-    this.texturaMola = loader.load('relieve_mola.png');
+    // 1. PANEL IZQUIERDO: SUPERFICIE CON ASTRONAUTA 3D ARTICULADO Y FLECHA VERDE
+    this.sceneMini = new THREE.Scene();
+    this.sceneMini.background = new THREE.Color(0x8c4f32);
+    this.sceneMini.fog = new THREE.FogExp2(0x9e5938, 0.007);
 
-    const geoTerreno = new THREE.PlaneGeometry(200, 125, 180, 120);
-    geoTerreno.rotateX(-Math.PI / 2);
-    const posAttr = geoTerreno.attributes['position'];
-    for (let i = 0; i < posAttr.count; i++) {
-      posAttr.setY(i, this.calcularElevacionMonteSharp(posAttr.getX(i), posAttr.getZ(i)));
-    }
-    geoTerreno.computeVertexNormals();
+    this.sceneMini.add(new THREE.AmbientLight(0xffd8be, 0.85));
+    const solMini = new THREE.DirectionalLight(0xfff1e0, 1.65);
+    solMini.position.set(-60, 95, -40);
+    this.sceneMini.add(solMini);
 
-    this.terrenoMesh = new THREE.Mesh(
-      geoTerreno,
-      new THREE.MeshStandardMaterial({ map: this.texturaCuriosity, roughness: 0.88, metalness: 0.06 })
+    const meshSueloMini = new THREE.Mesh(
+      crearMallaTerrenoMOLA(),
+      new THREE.MeshStandardMaterial({ map: texturaSuelo, roughness: 0.9, metalness: 0.05 })
     );
-    this.scene.add(this.terrenoMesh);
+    this.sceneMini.add(meshSueloMini);
 
-    // Malla topográfica sutil para dar sensación de velocidad al moverse en el visor derecho
-    const mallaVelocidad = new THREE.Mesh(
-      geoTerreno.clone(),
-      new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.07 })
-    );
-    mallaVelocidad.position.y = 0.05;
-    this.scene.add(mallaVelocidad);
-
-    const geoRoca = new THREE.DodecahedronGeometry(1, 1);
-    const matRoca = new THREE.MeshStandardMaterial({ color: 0x6e351c, roughness: 0.95 });
-    for (let i = 0; i < 150; i++) {
-      const rx = (Math.random() - 0.5) * 185;
-      const rz = (Math.random() - 0.5) * 115;
-      const ry = this.calcularElevacionMonteSharp(rx, rz);
-      const roca = new THREE.Mesh(geoRoca, matRoca);
-      const esc = 0.14 + Math.random() * 0.28;
-      roca.scale.set(esc * 1.3, esc * 0.6, esc);
-      roca.position.set(rx, ry + esc * 0.12, rz);
-      this.scene.add(roca);
+    for (const c of this.crateresDetectados) {
+      const centro = this.svgA3D(c.svgX, c.svgY);
+      const r3D = c.radio * 0.5;
+      const ptsAnillo: THREE.Vector3[] = [];
+      for (let i = 0; i <= 48; i++) {
+        const ang = (i / 48) * Math.PI * 2;
+        const wx = centro.x + Math.cos(ang) * r3D;
+        const wz = centro.z + Math.sin(ang) * r3D;
+        ptsAnillo.push(new THREE.Vector3(wx, this.calcularElevacionMarteMOLA(wx, wz) + 0.25, wz));
+      }
+      this.sceneMini.add(
+        new THREE.Line(
+          new THREE.BufferGeometry().setFromPoints(ptsAnillo),
+          new THREE.LineBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.8 })
+        )
+      );
     }
 
-    this.grupoOndaCalor = new THREE.Group();
-    this.scene.add(this.grupoOndaCalor);
+    this.actorSuperficieGroup = new THREE.Group();
+    const shapeFlecha = new THREE.Shape();
+    shapeFlecha.moveTo(0, 1.35);
+    shapeFlecha.lineTo(-0.95, -0.85);
+    shapeFlecha.lineTo(0, -0.30);
+    shapeFlecha.lineTo(0.95, -0.85);
+    shapeFlecha.closePath();
 
-    // Avatar 3D del Astronauta
-    this.astronautaMesh = new THREE.Group();
-    const matTraje = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
-    const matVisor = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.8, roughness: 0.2 });
+    const geoFlecha = new THREE.ExtrudeGeometry(shapeFlecha, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04 });
+    geoFlecha.rotateX(Math.PI / 2);
+    const meshFlecha = new THREE.Mesh(
+      geoFlecha,
+      new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x15803d, emissiveIntensity: 0.45, roughness: 0.3 })
+    );
+    meshFlecha.position.y = 0.22;
+    this.actorSuperficieGroup.add(meshFlecha);
+
+    const matTraje = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 });
+    const matVisor = new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.85, roughness: 0.15 });
     const matMochila = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5 });
 
-    this.piernaIzq = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.55, 0.18), matTraje);
-    this.piernaIzq.position.set(-0.14, 0.28, 0);
-    this.piernaDer = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.55, 0.18), matTraje);
-    this.piernaDer.position.set(0.14, 0.28, 0);
+    this.piernaIzq = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.50, 0.16), matTraje);
+    this.piernaIzq.position.set(-0.12, 0.45, 0);
+    this.piernaDer = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.50, 0.16), matTraje);
+    this.piernaDer.position.set(0.12, 0.45, 0);
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.54, 0.28), matTraje);
+    torso.position.set(0, 0.92, 0);
+    const mochila = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.46, 0.22), matMochila);
+    mochila.position.set(0, 0.94, -0.22);
+    const casco = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 16), matTraje);
+    casco.position.set(0, 1.36, 0);
+    const visor = new THREE.Mesh(new THREE.SphereGeometry(0.19, 14, 14), matVisor);
+    visor.position.set(0, 1.37, 0.07);
+    this.brazoIzq = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.44, 0.14), matTraje);
+    this.brazoIzq.position.set(-0.30, 0.90, 0);
+    this.brazoDer = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.44, 0.14), matTraje);
+    this.brazoDer.position.set(0.30, 0.90, 0);
 
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.32), matTraje);
-    torso.position.set(0, 0.82, 0);
-    const mochila = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.52, 0.24), matMochila);
-    mochila.position.set(0, 0.85, -0.24);
+    this.actorSuperficieGroup.add(this.piernaIzq, this.piernaDer, torso, mochila, casco, visor, this.brazoIzq, this.brazoDer);
+    this.sceneMini.add(this.actorSuperficieGroup);
 
-    const casco = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 16), matTraje);
-    casco.position.set(0, 1.32, 0);
-    const visorOro = new THREE.Mesh(new THREE.SphereGeometry(0.21, 14, 14), matVisor);
-    visorOro.position.set(0, 1.33, 0.08);
+    this.grupoRutaMini = new THREE.Group();
+    this.grupoOndaMini = new THREE.Group();
+    this.sceneMini.add(this.grupoRutaMini);
+    this.sceneMini.add(this.grupoOndaMini);
 
-    this.brazoIzq = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.15), matTraje);
-    this.brazoIzq.position.set(-0.34, 0.8, 0);
-    this.brazoDer = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.5, 0.15), matTraje);
-    this.brazoDer.position.set(0.34, 0.8, 0);
+    this.cameraMini = new THREE.PerspectiveCamera(52, divMini.clientWidth / divMini.clientHeight, 0.2, 350);
+    this.rendererMini = new THREE.WebGLRenderer({ antialias: true });
+    this.rendererMini.setSize(divMini.clientWidth, divMini.clientHeight);
+    this.rendererMini.setPixelRatio(window.devicePixelRatio);
+    divMini.innerHTML = '';
+    divMini.appendChild(this.rendererMini.domElement);
 
-    const aroPies = new THREE.Mesh(
-      new THREE.RingGeometry(0.65, 0.95, 24),
-      new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide })
-    );
-    aroPies.rotation.x = -Math.PI / 2;
-    aroPies.position.y = 0.05;
-
-    this.astronautaMesh.add(this.piernaIzq, this.piernaDer, torso, mochila, casco, visorOro, this.brazoIzq, this.brazoDer, aroPies);
-    this.scene.add(this.astronautaMesh);
-
-    this.flechaTangenteAstro = new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 3.6, 0xfacc15, 0.95, 0.55);
-    this.scene.add(this.flechaTangenteAstro);
-
-    this.grupoGrafoOrbital = new THREE.Group();
-    this.grupoVectoresOrbital = new THREE.Group();
-    this.grupoMarcadoresHud = new THREE.Group();
-    this.scene.add(this.grupoGrafoOrbital);
-    this.scene.add(this.grupoVectoresOrbital);
-    this.scene.add(this.grupoMarcadoresHud);
-
-    // 1. CÁMARA Y EVENTOS DEL MAPA IZQUIERDO (PANEL 1)
-    this.cameraBase = new THREE.PerspectiveCamera(42, contenedorBase.clientWidth / contenedorBase.clientHeight, 0.5, 800);
-    this.actualizarCamaraOrbitalBase();
-
-    this.rendererBase = new THREE.WebGLRenderer({ antialias: true });
-    this.rendererBase.setSize(contenedorBase.clientWidth, contenedorBase.clientHeight);
-    this.rendererBase.setPixelRatio(window.devicePixelRatio);
-    contenedorBase.innerHTML = '';
-    contenedorBase.appendChild(this.rendererBase.domElement);
-
-    const domBase = this.rendererBase.domElement;
-    domBase.addEventListener('mousedown', (e) => {
-      this.arrastrandoBase = true;
-      this.mousePrevBase = { x: e.clientX, y: e.clientY };
+    const domMini = this.rendererMini.domElement;
+    domMini.addEventListener('mousedown', (e) => {
+      this.arrastrandoMini = true;
+      this.mousePrev = { x: e.clientX, y: e.clientY };
     });
     window.addEventListener('mouseup', () => {
-      this.arrastrandoBase = false;
-      this.arrastrandoHud = false;
+      this.arrastrandoMini = false;
+      this.arrastrandoDerecha = false;
     });
-    domBase.addEventListener('mousemove', (e) => {
-      if (!this.arrastrandoBase) return;
-      this.anguloOrbitaBase.theta -= (e.clientX - this.mousePrevBase.x) * 0.009;
-      this.anguloOrbitaBase.phi = Math.max(0.18, Math.min(1.45, this.anguloOrbitaBase.phi - (e.clientY - this.mousePrevBase.y) * 0.009));
-      this.mousePrevBase = { x: e.clientX, y: e.clientY };
-      this.actualizarCamaraOrbitalBase();
+    domMini.addEventListener('mousemove', (e) => {
+      if (!this.arrastrandoMini) return;
+      this.yawMiniOffset -= (e.clientX - this.mousePrev.x) * 0.008;
+      this.pitchMiniOffset = Math.max(0.15, Math.min(1.25, this.pitchMiniOffset + (e.clientY - this.mousePrev.y) * 0.007));
+      this.mousePrev = { x: e.clientX, y: e.clientY };
     });
-    domBase.addEventListener('wheel', (e) => {
+    domMini.addEventListener('wheel', (e) => {
       e.preventDefault();
-      // Zoom rápido y fluido en el mapa izquierdo
-      this.anguloOrbitaBase.radio = Math.max(25, Math.min(250, this.anguloOrbitaBase.radio + e.deltaY * 0.14));
-      this.actualizarCamaraOrbitalBase();
+      this.distMini = Math.max(4.5, Math.min(35.0, this.distMini + e.deltaY * 0.02));
     }, { passive: false });
 
-    // 2. CÁMARA Y EVENTOS INTERACTIVOS DEL VISOR DERECHO (PANEL 3 - ZOOM Y GIRO LIBRE)
-    this.cameraHud = new THREE.PerspectiveCamera(this.hudOrbita.fov, contenedorHud.clientWidth / contenedorHud.clientHeight, 0.15, 500);
-    this.rendererHud = new THREE.WebGLRenderer({ antialias: true });
-    this.rendererHud.setSize(contenedorHud.clientWidth, contenedorHud.clientHeight);
-    this.rendererHud.setPixelRatio(window.devicePixelRatio);
-    contenedorHud.innerHTML = '';
-    contenedorHud.appendChild(this.rendererHud.domElement);
+    // 2. PANEL DERECHO: MAPA MOLA DE CRÁTERES, NODOS Y SALIDA DE ESCAPE
+    this.sceneMapaNodos = new THREE.Scene();
+    this.sceneMapaNodos.background = new THREE.Color(0x110a06);
 
-    const domHud = this.rendererHud.domElement;
-    domHud.addEventListener('mousedown', (e) => {
-      this.arrastrandoHud = true;
-      this.mousePrevHud = { x: e.clientX, y: e.clientY };
+    this.sceneMapaNodos.add(new THREE.AmbientLight(0xffd8be, 0.92));
+    const solDer = new THREE.DirectionalLight(0xfff1e0, 1.75);
+    solDer.position.set(60, 130, -50);
+    this.sceneMapaNodos.add(solDer);
+
+    const meshSueloDerecha = new THREE.Mesh(
+      crearMallaTerrenoMOLA(),
+      new THREE.MeshStandardMaterial({ map: texturaSuelo, roughness: 0.88, metalness: 0.06 })
+    );
+    this.sceneMapaNodos.add(meshSueloDerecha);
+
+    this.grupoCrateresRojos = new THREE.Group();
+    this.grupoGrafoCompleto = new THREE.Group();
+    this.grupoOndaDerecha = new THREE.Group();
+    this.sceneMapaNodos.add(this.grupoCrateresRojos);
+    this.sceneMapaNodos.add(this.grupoGrafoCompleto);
+    this.sceneMapaNodos.add(this.grupoOndaDerecha);
+
+    this.marcadorAstronautaDerecha = new THREE.Group();
+    const esferaAstro = new THREE.Mesh(
+      new THREE.SphereGeometry(2.2, 18, 18),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+    );
+    const aroRojoAstro = new THREE.Mesh(
+      new THREE.RingGeometry(2.3, 3.3, 24),
+      new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide })
+    );
+    aroRojoAstro.rotation.x = -Math.PI / 2;
+    this.marcadorAstronautaDerecha.add(esferaAstro, aroRojoAstro);
+    this.sceneMapaNodos.add(this.marcadorAstronautaDerecha);
+
+    this.cameraMapaNodos = new THREE.PerspectiveCamera(42, divDerecha.clientWidth / divDerecha.clientHeight, 1, 600);
+    this.actualizarCamaraDerecha();
+
+    this.rendererMapaNodos = new THREE.WebGLRenderer({ antialias: true });
+    this.rendererMapaNodos.setSize(divDerecha.clientWidth, divDerecha.clientHeight);
+    this.rendererMapaNodos.setPixelRatio(window.devicePixelRatio);
+    divDerecha.innerHTML = '';
+    divDerecha.appendChild(this.rendererMapaNodos.domElement);
+
+    const domDer = this.rendererMapaNodos.domElement;
+    domDer.addEventListener('mousedown', (e) => {
+      this.arrastrandoDerecha = true;
+      this.mousePrev = { x: e.clientX, y: e.clientY };
     });
-    domHud.addEventListener('mousemove', (e) => {
-      if (!this.arrastrandoHud) return;
-      const dx = e.clientX - this.mousePrevHud.x;
-      const dy = e.clientY - this.mousePrevHud.y;
-      // Permite girar 360° e inclinar libremente la cámara de la derecha
-      this.hudOrbita.yawOffset -= dx * 0.011;
-      this.hudOrbita.pitchOffset = Math.max(-0.35, Math.min(1.35, this.hudOrbita.pitchOffset + dy * 0.009));
-      this.mousePrevHud = { x: e.clientX, y: e.clientY };
+    domDer.addEventListener('mousemove', (e) => {
+      if (!this.arrastrandoDerecha) return;
+      this.orbitaDerecha.theta -= (e.clientX - this.mousePrev.x) * 0.009;
+      this.orbitaDerecha.phi = Math.max(0.15, Math.min(1.38, this.orbitaDerecha.phi - (e.clientY - this.mousePrev.y) * 0.008));
+      this.mousePrev = { x: e.clientX, y: e.clientY };
+      this.actualizarCamaraDerecha();
     });
-    domHud.addEventListener('wheel', (e) => {
+    domDer.addEventListener('wheel', (e) => {
       e.preventDefault();
-      const paso = e.deltaY > 0 ? 1.8 : -1.8;
-      this.ajustarZoomDerecha(paso);
+      this.orbitaDerecha.radio = Math.max(55, Math.min(240, this.orbitaDerecha.radio + e.deltaY * 0.09));
+      this.actualizarCamaraDerecha();
     }, { passive: false });
 
-    this.reconstruirGrafoYRuta3D();
+    this.reconstruirRutasEnAmbosVisores();
   }
 
-  // Controla el zoom de la pantalla derecha (tanto con rueda del mouse como con botones + / -)
-  ajustarZoomDerecha(deltaDistancia: number) {
-    if (this.modoVistaDerecha === 'SEGUIMIENTO') {
-      this.hudOrbita.distancia = Math.max(1.8, Math.min(35.0, this.hudOrbita.distancia + deltaDistancia));
-      this.nivelZoomDerecha = Math.round((6.5 / this.hudOrbita.distancia) * 100);
-    } else {
-      // En modo Primera Persona ajusta el zoom óptico del lente (FOV)
-      this.hudOrbita.fov = Math.max(22, Math.min(85, this.hudOrbita.fov + deltaDistancia * 3.5));
-      if (this.cameraHud) {
-        this.cameraHud.fov = this.hudOrbita.fov;
-        this.cameraHud.updateProjectionMatrix();
-      }
-      this.nivelZoomDerecha = Math.round((60 / this.hudOrbita.fov) * 100);
+  private actualizarCamaraDerecha() {
+    if (!this.cameraMapaNodos) return;
+    const { theta, phi, radio } = this.orbitaDerecha;
+    this.cameraMapaNodos.position.x = radio * Math.sin(phi) * Math.sin(theta);
+    this.cameraMapaNodos.position.y = radio * Math.cos(phi);
+    this.cameraMapaNodos.position.z = radio * Math.sin(phi) * Math.cos(theta);
+    this.cameraMapaNodos.lookAt(0, 0, 2);
+  }
+
+  private crearDiscoTerreno(cx: number, cz: number, radio: number, colorHex: number, opacidad: number, alturaExtra: number): THREE.Mesh {
+    const geo = new THREE.CircleGeometry(radio, 40);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes['position'];
+    for (let i = 0; i < pos.count; i++) {
+      const wx = cx + pos.getX(i);
+      const wz = cz + pos.getZ(i);
+      pos.setXYZ(i, wx, this.calcularElevacionMarteMOLA(wx, wz) + alturaExtra, wz);
     }
-    this.cdr.detectChanges();
+    geo.computeVertexNormals();
+    return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: opacidad, side: THREE.DoubleSide, depthWrite: false }));
   }
 
-  // Cambia entre ver al astronauta caminando en 3D (Seguimiento) o ver desde adentro de sus ojos (1ra Persona)
-  alternarModoVistaDerecha() {
-    if (this.modoVistaDerecha === 'SEGUIMIENTO') {
-      this.modoVistaDerecha = 'PRIMERA_PERSONA';
-      this.hudOrbita.fov = 60;
-      this.hudOrbita.yawOffset = 0;
-      this.hudOrbita.pitchOffset = 0.08;
-      this.nivelZoomDerecha = 100;
-    } else {
-      this.modoVistaDerecha = 'SEGUIMIENTO';
-      this.hudOrbita.distancia = 6.5;
-      this.hudOrbita.fov = 60;
-      this.hudOrbita.yawOffset = 0;
-      this.hudOrbita.pitchOffset = 0.32;
-      this.nivelZoomDerecha = 100;
+  private crearAnilloTerreno(cx: number, cz: number, radio: number, colorHex: number): THREE.Line {
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i <= 64; i++) {
+      const ang = (i / 64) * Math.PI * 2;
+      const wx = cx + Math.cos(ang) * radio;
+      const wz = cz + Math.sin(ang) * radio;
+      pts.push(new THREE.Vector3(wx, this.calcularElevacionMarteMOLA(wx, wz) + 0.35, wz));
     }
-    if (this.cameraHud) {
-      this.cameraHud.fov = this.hudOrbita.fov;
-      this.cameraHud.updateProjectionMatrix();
-    }
-    this.cdr.detectChanges();
+    return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: colorHex }));
   }
 
-  recentrarCamaraDerecha() {
-    this.hudOrbita.yawOffset = 0;
-    this.hudOrbita.pitchOffset = this.modoVistaDerecha === 'SEGUIMIENTO' ? 0.32 : 0.08;
-    this.hudOrbita.distancia = 6.5;
-    this.hudOrbita.fov = 60;
-    this.nivelZoomDerecha = 100;
-    if (this.cameraHud) {
-      this.cameraHud.fov = 60;
-      this.cameraHud.updateProjectionMatrix();
-    }
-    this.cdr.detectChanges();
-  }
+  private reconstruirRutasEnAmbosVisores() {
+    if (!this.grupoRutaMini || !this.grupoGrafoCompleto || !this.datosMision) return;
 
-  ajustarZoomIzquierda(delta: number) {
-    this.anguloOrbitaBase.radio = Math.max(25, Math.min(250, this.anguloOrbitaBase.radio + delta));
-    this.actualizarCamaraOrbitalBase();
-  }
-
-  enfocarAstronautaIzquierda() {
-    if (this.astronautaMesh) {
-      this.centroOrbitaBase.copy(this.astronautaMesh.position);
-      this.anguloOrbitaBase.radio = 65;
-      this.actualizarCamaraOrbitalBase();
-    }
-  }
-
-  cambiarVelocidad(vel: number) {
-    this.velocidadSimulacion = vel;
-    this.caminataActiva = true;
-  }
-
-  private actualizarCamaraOrbitalBase() {
-    if (!this.cameraBase) return;
-    const { theta, phi, radio } = this.anguloOrbitaBase;
-    this.cameraBase.position.x = this.centroOrbitaBase.x + radio * Math.sin(phi) * Math.sin(theta);
-    this.cameraBase.position.y = this.centroOrbitaBase.y + radio * Math.cos(phi);
-    this.cameraBase.position.z = this.centroOrbitaBase.z + radio * Math.sin(phi) * Math.cos(theta);
-    this.cameraBase.lookAt(this.centroOrbitaBase);
-  }
-
-  private reconstruirGrafoYRuta3D() {
-    if (!this.scene || !this.datosMision) return;
-
-    while (this.grupoGrafoOrbital.children.length > 0) this.grupoGrafoOrbital.remove(this.grupoGrafoOrbital.children[0]);
-    while (this.grupoVectoresOrbital.children.length > 0) this.grupoVectoresOrbital.remove(this.grupoVectoresOrbital.children[0]);
-    while (this.grupoMarcadoresHud.children.length > 0) this.grupoMarcadoresHud.remove(this.grupoMarcadoresHud.children[0]);
-    while (this.grupoOndaCalor.children.length > 0) this.grupoOndaCalor.remove(this.grupoOndaCalor.children[0]);
-    this.anillosPulsoCalor = [];
-    this.balizasCaminoHud = [];
-
-    for (const n of this.datosMision.todos_nodos) {
-      const pos = this.svgA3D(n.svgX, n.svgY);
-      const esRefugio = n.tipo === 'REFUGIO';
-      const esActual = n.id === this.nodoActualId;
-      const colorHex = esActual ? 0xfacc15 : esRefugio ? 0x38bdf8 : 0x00ff88;
-
-      const meshNodoOrbital = new THREE.Mesh(
-        new THREE.SphereGeometry(esActual ? 0.72 : 0.48, 16, 16),
-        new THREE.MeshBasicMaterial({ color: colorHex })
-      );
-      meshNodoOrbital.position.set(pos.x, pos.y + 0.35, pos.z);
-      this.grupoGrafoOrbital.add(meshNodoOrbital);
-
-      const anilloBase = new THREE.Mesh(
-        new THREE.RingGeometry(0.7, 1.05, 24),
-        new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, transparent: true, opacity: 0.7 })
-      );
-      anilloBase.rotation.x = -Math.PI / 2;
-      anilloBase.position.set(pos.x, pos.y + 0.08, pos.z);
-      this.grupoGrafoOrbital.add(anilloBase);
-
-      const etiquetaOrbital = this.crearEtiquetaSprite(
-        n.id,
-        esActual ? 'rgba(202, 138, 4, 0.95)' : esRefugio ? 'rgba(2, 132, 199, 0.92)' : 'rgba(15, 23, 42, 0.88)',
-        1.05
-      );
-      etiquetaOrbital.position.set(pos.x, pos.y + 2.2, pos.z);
-      this.grupoGrafoOrbital.add(etiquetaOrbital);
-
-      const aroHud = new THREE.Mesh(
-        new THREE.RingGeometry(0.45, 0.72, 24),
-        new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
-      );
-      aroHud.rotation.x = -Math.PI / 2;
-      aroHud.position.set(pos.x, pos.y + 0.06, pos.z);
-      this.grupoMarcadoresHud.add(aroHud);
-
-      const etiquetaHud = this.crearEtiquetaSprite(
-        `${n.id}`,
-        esRefugio ? 'rgba(2, 132, 199, 0.85)' : 'rgba(16, 185, 129, 0.85)',
-        0.65
-      );
-      etiquetaHud.position.set(pos.x, pos.y + 2.4, pos.z);
-      this.grupoMarcadoresHud.add(etiquetaHud);
-    }
-
-    const matRed = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.52 });
-    for (const a of this.datosMision.aristas_mapa) {
-      const ptsArista = this.generarPuntosPegadosAlTerreno(
-        [{ svgX: a.x1, svgY: a.y1 }, { svgX: a.x2, svgY: a.y2 }],
-        0.12
-      );
-      this.grupoGrafoOrbital.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsArista), matRed));
-      this.grupoMarcadoresHud.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ptsArista), matRed));
-    }
-
-    if (this.rutaTuboMesh) this.scene.remove(this.rutaTuboMesh);
-    if (this.rutaHudMesh) this.scene.remove(this.rutaHudMesh);
+    while (this.grupoRutaMini.children.length > 0) this.grupoRutaMini.remove(this.grupoRutaMini.children[0]);
+    while (this.grupoOndaMini.children.length > 0) this.grupoOndaMini.remove(this.grupoOndaMini.children[0]);
+    while (this.grupoCrateresRojos.children.length > 0) this.grupoCrateresRojos.remove(this.grupoCrateresRojos.children[0]);
+    while (this.grupoGrafoCompleto.children.length > 0) this.grupoGrafoCompleto.remove(this.grupoGrafoCompleto.children[0]);
+    while (this.grupoOndaDerecha.children.length > 0) this.grupoOndaDerecha.remove(this.grupoOndaDerecha.children[0]);
 
     const nodosRuta = this.datosMision.ruta_grafo_java;
-    const accion = this.datosMision.alerta_radiacion.codigo_accion;
-    const colorRuta = accion === 'AVANZAR' ? 0x00ff88 : accion === 'DESVIO' ? 0x38bdf8 : 0xff5500;
+    if (!nodosRuta || nodosRuta.length < 2) return;
 
-    if (nodosRuta && nodosRuta.length >= 2) {
-      const puntosSuelo = this.generarPuntosPegadosAlTerreno(nodosRuta, 0.14);
-      const curvaSuelo = new THREE.CatmullRomCurve3(puntosSuelo);
+    for (const c of this.crateresDetectados) {
+      const centro = this.svgA3D(c.svgX, c.svgY);
+      const r3D = c.radio * 0.5;
+      this.grupoCrateresRojos.add(this.crearDiscoTerreno(centro.x, centro.z, r3D, 0xdc2626, 0.52, 0.20));
 
-      this.rutaTuboMesh = new THREE.Mesh(
-        new THREE.TubeGeometry(curvaSuelo, 140, 0.22, 8, false),
-        new THREE.MeshBasicMaterial({ color: colorRuta })
-      );
-      this.grupoGrafoOrbital.add(this.rutaTuboMesh);
+      const etiqueta = this.crearEtiquetaSprite(`⛔ ${c.id}`, 'rgba(185, 28, 28, 0.94)', 0.9);
+      etiqueta.position.set(centro.x, centro.y + 3.6, centro.z);
+      this.grupoCrateresRojos.add(etiqueta);
+    }
 
-      const geoAlfombraHud = new THREE.TubeGeometry(curvaSuelo, 140, 0.6, 4, false);
-      geoAlfombraHud.scale(1, 0.04, 1);
-      this.rutaHudMesh = new THREE.Mesh(
-        geoAlfombraHud,
-        new THREE.MeshBasicMaterial({ color: colorRuta, transparent: true, opacity: 0.55 })
-      );
-      this.scene.add(this.rutaHudMesh);
-
-      // Balizas luminosas animadas a lo largo del camino para que en la pantalla derecha se note la velocidad
-      const totalBalizas = 24;
-      const geoBaliza = new THREE.ConeGeometry(0.28, 0.75, 4);
-      geoBaliza.rotateX(Math.PI / 2);
-      for (let b = 0; b < totalBalizas; b++) {
-        const t = b / totalBalizas;
-        const pt = curvaSuelo.getPointAt(t);
-        const tg = curvaSuelo.getTangentAt(t);
-        const meshBaliza = new THREE.Mesh(
-          geoBaliza,
-          new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
-        );
-        meshBaliza.position.set(pt.x, pt.y + 0.15, pt.z);
-        meshBaliza.lookAt(pt.x + tg.x, pt.y + tg.y + 0.15, pt.z + tg.z);
-        this.grupoMarcadoresHud.add(meshBaliza);
-        this.balizasCaminoHud.push(meshBaliza);
-      }
-
-      for (let i = 0; i < nodosRuta.length - 1; i++) {
-        const pA = this.svgA3D(nodosRuta[i].svgX, nodosRuta[i].svgY);
-        const pB = this.svgA3D(nodosRuta[i + 1].svgX, nodosRuta[i + 1].svgY);
-        const xm = (pA.x + pB.x) * 0.5;
-        const zm = (pA.z + pB.z) * 0.5;
-        const ym = this.calcularElevacionMonteSharp(xm, zm) + 0.32;
-        const pMedio = new THREE.Vector3(xm, ym, zm);
-
-        pB.y = this.calcularElevacionMonteSharp(pB.x, pB.z) + 0.32;
-        const dirUniforme = new THREE.Vector3().subVectors(pB, pMedio).normalize();
-
-        const flechaTramo = new THREE.ArrowHelper(dirUniforme, pMedio, 2.5, colorRuta, 0.8, 0.5);
-        this.grupoVectoresOrbital.add(flechaTramo);
-
-        const flechaHud = new THREE.ArrowHelper(dirUniforme, pMedio, 2.2, colorRuta, 0.7, 0.45);
-        this.grupoMarcadoresHud.add(flechaHud);
+    const mapById = new Map<string, any>();
+    this.catalogoNodos.forEach(n => mapById.set(n.id, n));
+    const matRed = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.26 });
+    for (const [id1, id2] of this.paresAristas) {
+      const o = mapById.get(id1);
+      const d = mapById.get(id2);
+      if (o && d) {
+        const p1 = this.svgA3D(o.svgX, o.svgY);
+        const p2 = this.svgA3D(d.svgX, d.svgY);
+        p1.y += 0.22;
+        p2.y += 0.22;
+        this.grupoGrafoCompleto.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([p1, p2]), matRed));
       }
     }
 
-    // Onda de Calor multicapa fuera del camino
-    const onda = this.obtenerParametrosOndaCalor(this.intensidadTormenta);
-    const centro3D = this.svgA3D(onda.epicentroSvgX, onda.epicentroSvgY);
-    const rBaseX = 8.0 + onda.factor * 20.0;
-    const rBaseZ = 6.5 + onda.factor * 15.5;
+    for (const n of this.catalogoNodos) {
+      const pos = this.svgA3D(n.svgX, n.svgY);
+      const esEscape = n.emergencia === true;
+      const esRutaSegura = n.terreno === 'RUTA_SEGURA';
+      const colorN = esEscape ? 0xfacc15 : esRutaSegura ? 0x38bdf8 : 0x10b981;
 
-    this.grupoOndaCalor.add(
-      this.crearCapaOndaCalorTerreno(centro3D.x, centro3D.z, rBaseX * 1.35, rBaseZ * 1.35, 0xfacc15, 0.14 + onda.factor * 0.12, 0.10),
-      this.crearCapaOndaCalorTerreno(centro3D.x, centro3D.z, rBaseX * 1.0, rBaseZ * 1.0, 0xff7700, 0.22 + onda.factor * 0.16, 0.14),
-      this.crearCapaOndaCalorTerreno(centro3D.x, centro3D.z, rBaseX * 0.68, rBaseZ * 0.68, 0xff2a00, 0.30 + onda.factor * 0.20, 0.18),
-      this.crearCapaOndaCalorTerreno(centro3D.x, centro3D.z, rBaseX * 0.38, rBaseZ * 0.38, 0xdc2626, 0.45, 0.22)
-    );
-
-    const anilloAlerta = this.crearAnilloTermicoTerreno(centro3D.x, centro3D.z, rBaseX * 1.35, rBaseZ * 1.35, 0xfacc15, 0.85);
-    const anilloMedio = this.crearAnilloTermicoTerreno(centro3D.x, centro3D.z, rBaseX * 1.0, rBaseZ * 1.0, 0xff5500, 0.9);
-    this.grupoOndaCalor.add(anilloAlerta, anilloMedio);
-    this.anillosPulsoCalor.push(anilloAlerta, anilloMedio);
-
-    const nodosInicialesObjetivo = [
-      this.svgA3D(88, 150),
-      this.svgA3D(110, 166),
-      this.svgA3D(134, 182)
-    ];
-    for (const obj of nodosInicialesObjetivo) {
-      const dirCalor = new THREE.Vector3(obj.x - centro3D.x, 0, obj.z - centro3D.z).normalize();
-      const pBordeOnda = new THREE.Vector3(
-        centro3D.x + dirCalor.x * (rBaseX * 0.85),
-        this.calcularElevacionMonteSharp(centro3D.x + dirCalor.x * (rBaseX * 0.85), centro3D.z + dirCalor.z * (rBaseZ * 0.85)) + 0.35,
-        centro3D.z + dirCalor.z * (rBaseZ * 0.85)
+      const esferaN = new THREE.Mesh(
+        new THREE.SphereGeometry(esEscape ? 1.45 : 0.72, 14, 14),
+        new THREE.MeshBasicMaterial({ color: colorN })
       );
-      this.grupoOndaCalor.add(new THREE.ArrowHelper(dirCalor, pBordeOnda, 2.8, 0xff3b00, 0.85, 0.55));
+      esferaN.position.set(pos.x, pos.y + 0.45, pos.z);
+      this.grupoGrafoCompleto.add(esferaN);
+
+      if (esEscape || n.id === 'N0' || n.id === 'META') {
+        const texto = esEscape ? `★ ${n.id} SALIDA` : n.id;
+        const fondo = esEscape ? 'rgba(202, 138, 4, 0.98)' : 'rgba(15, 23, 42, 0.92)';
+        const etiq = this.crearEtiquetaSprite(texto, fondo, esEscape ? 1.05 : 0.85);
+        etiq.position.set(pos.x, pos.y + 2.8, pos.z);
+        this.grupoGrafoCompleto.add(etiq);
+      }
+    }
+
+    const factorOnda = Math.max(0, (this.intensidadTormenta - 10) / 80);
+    const centroOnda = this.svgA3D(185, 228 - factorOnda * 65);
+    const radioOnda3D = (26 + factorOnda * 68) * 0.5;
+
+    this.grupoOndaDerecha.add(this.crearDiscoTerreno(centroOnda.x, centroOnda.z, radioOnda3D, 0xff5500, 0.44, 0.16));
+    this.grupoOndaDerecha.add(this.crearAnilloTerreno(centroOnda.x, centroOnda.z, radioOnda3D, 0xfacc15));
+    this.grupoOndaMini.add(this.crearDiscoTerreno(centroOnda.x, centroOnda.z, radioOnda3D, 0xff5500, 0.32, 0.12));
+
+    if (this.escapeActivo) {
+      const ptsPeligro = this.generarPuntosRodeandoCrateres(this.nodosValleCentral, 0.14);
+      const curvaPeligro = new THREE.CatmullRomCurve3(ptsPeligro);
+      const geoRojo = new THREE.TubeGeometry(curvaPeligro, 120, 0.45, 6, false);
+      this.grupoGrafoCompleto.add(
+        new THREE.Mesh(geoRojo, new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.55 }))
+      );
+    }
+
+    const ptsSeguros = this.generarPuntosRodeandoCrateres(nodosRuta, 0.18);
+    const curvaActiva = new THREE.CatmullRomCurve3(ptsSeguros);
+
+    const colorCintaMini = this.escapeActivo ? 0x06b6d4 : 0x2563eb;
+    const geoCintaMini = new THREE.TubeGeometry(curvaActiva, 160, 0.92, 6, false);
+    geoCintaMini.scale(1, 0.06, 1);
+    this.grupoRutaMini.add(new THREE.Mesh(geoCintaMini, new THREE.MeshBasicMaterial({ color: colorCintaMini, transparent: true, opacity: 0.84 })));
+
+    const geoCentroMini = new THREE.TubeGeometry(curvaActiva, 160, 0.24, 6, false);
+    geoCentroMini.scale(1, 0.08, 1);
+    this.grupoRutaMini.add(new THREE.Mesh(geoCentroMini, new THREE.MeshBasicMaterial({ color: 0x93c5fd })));
+
+    const colorTuboDer = this.escapeActivo ? 0x00ffff : 0x00ff88;
+    const geoTuboDer = new THREE.TubeGeometry(curvaActiva, 160, 0.90, 8, false);
+    this.grupoGrafoCompleto.add(new THREE.Mesh(geoTuboDer, new THREE.MeshBasicMaterial({ color: colorTuboDer })));
+
+    for (let i = 1; i < nodosRuta.length; i++) {
+      const pNodo = this.svgA3D(nodosRuta[i].svgX, nodosRuta[i].svgY);
+      const esEsc = nodosRuta[i].emergencia === true;
+      const esferaNodoMini = new THREE.Mesh(
+        new THREE.SphereGeometry(esEsc ? 0.78 : 0.58, 20, 20),
+        new THREE.MeshStandardMaterial({
+          color: esEsc ? 0xfacc15 : 0x60a5fa,
+          emissive: esEsc ? 0xd97706 : 0x2563eb,
+          emissiveIntensity: 0.85,
+          roughness: 0.2
+        })
+      );
+      esferaNodoMini.position.set(pNodo.x, pNodo.y + 0.52, pNodo.z);
+      this.grupoRutaMini.add(esferaNodoMini);
     }
   }
 
-  private animarSimulacion3D() {
-    this.animFrameId = requestAnimationFrame(() => this.animarSimulacion3D());
-
-    const dt = this.reloj.getDelta();
+  // Bucle de movimiento físico directo sobre (posAstroSvg.x, posAstroSvg.y): jamás salta ni se reinicia al cambiar la radiación
+  private animarSimulacionContinua() {
+    this.animFrameId = requestAnimationFrame(() => this.animarSimulacionContinua());
+    const dt = Math.min(0.1, this.reloj.getDelta());
     const tiempoTotal = this.reloj.getElapsedTime();
 
-    if (this.anillosPulsoCalor.length > 0) {
-      const pulso = 0.5 + 0.5 * Math.sin(tiempoTotal * 5.0);
-      this.anillosPulsoCalor.forEach((anillo, idx) => {
-        const mat = anillo.material as THREE.LineBasicMaterial;
-        mat.opacity = idx === 0 ? 0.45 + pulso * 0.5 : 0.55 + (1 - pulso) * 0.4;
-      });
-    }
-
-    // Efecto de flujo secuencial en las flechas del camino para notar velocidad en la pantalla derecha
-    if (this.balizasCaminoHud.length > 0) {
-      this.balizasCaminoHud.forEach((b, i) => {
-        const mat = b.material as THREE.MeshBasicMaterial;
-        mat.opacity = 0.25 + 0.75 * Math.max(0, Math.sin(tiempoTotal * 7.0 - i * 0.7));
-      });
-    }
-
-    if (this.datosMision && this.datosMision.ruta_grafo_java && this.datosMision.ruta_grafo_java.length > 0) {
+    if (this.datosMision && this.datosMision.ruta_grafo_java && this.datosMision.ruta_grafo_java.length >= 2) {
       const ruta = this.datosMision.ruta_grafo_java;
-      const tieneSiguiente = ruta.length >= 2;
-      const enMovimiento = this.caminataActiva && tieneSiguiente;
+      const wpDestino = ruta[Math.min(ruta.length - 1, this.indiceWaypointObjetivo)];
 
-      const nActual = ruta[0];
-      const nSiguiente = tieneSiguiente ? ruta[1] : ruta[0];
+      const dx = wpDestino.svgX - this.posAstroSvg.x;
+      const dy = wpDestino.svgY - this.posAstroSvg.y;
+      const distAlWaypoint = Math.hypot(dx, dy);
 
-      const p0 = this.svgA3D(nActual.svgX, nActual.svgY);
-      const p1 = this.svgA3D(nSiguiente.svgX, nSiguiente.svgY);
+      if (this.caminataActiva) {
+        // Velocidad constante en unidades SVG/seg equivalente a ~0.62 m/s
+        const pasoSvg = dt * 11.5;
+        if (distAlWaypoint <= pasoSvg + 1.5) {
+          this.posAstroSvg.x = wpDestino.svgX;
+          this.posAstroSvg.y = wpDestino.svgY;
+          this.nodoActualId = wpDestino.id;
 
-      if (enMovimiento) {
-        const vel = this.datosMision.calculos_fisicos.velocidad_real_m_s || 1.05;
-        // Aplica el multiplicador de velocidad elegido por el usuario (1x, 2.5x, 5x)
-        this.progresoSegmento += dt * 0.38 * vel * this.velocidadSimulacion;
+          if (this.indiceWaypointObjetivo < ruta.length - 1) {
+            this.indiceWaypointObjetivo++;
+          } else {
+            // Solo vuelve a empezar desde N0 cuando llega físicamente hasta la META final
+            this.posAstroSvg = { x: 34, y: 126 };
+            this.nodoActualId = 'N0';
+          }
+          this.datosMision = this.recalcularRutaSinReiniciarAstronauta();
+          this.reconstruirRutasEnAmbosVisores();
+          this.cdr.detectChanges();
+        } else {
+          const nx = this.posAstroSvg.x + (dx / distAlWaypoint) * pasoSvg;
+          const ny = this.posAstroSvg.y + (dy / distAlWaypoint) * pasoSvg;
+          // Garantiza que en cada milisegundo bordee el exterior de los cráteres
+          const puntoSeguro = this.asegurarPuntoFueraDeCrateres(nx, ny);
+          this.posAstroSvg.x = puntoSeguro.x;
+          this.posAstroSvg.y = puntoSeguro.y;
+        }
 
-        if (this.progresoSegmento >= 1.0) {
-          this.progresoSegmento = 0;
-          this.nodoActualId = nSiguiente.id;
-          this.actualizarRutaYTelemetria();
-          return;
+        // Verifica en tiempo real si la radiación alcanzó la posición donde va caminando el astronauta
+        const factorOnda = Math.max(0, (this.intensidadTormenta - 10) / 80);
+        const epicentroY = 228 - factorOnda * 65;
+        const radioOnda = 26 + factorOnda * 68;
+        if (!this.escapeActivo && Math.hypot(this.posAstroSvg.x - 185, this.posAstroSvg.y - epicentroY) < radioOnda + 32) {
+          this.datosMision = this.recalcularRutaSinReiniciarAstronauta();
+          this.reconstruirRutasEnAmbosVisores();
+          this.cdr.detectChanges();
         }
       }
 
-      const u = tieneSiguiente ? Math.min(1.0, Math.max(0.0, this.progresoSegmento)) : 0;
-      const xActual = THREE.MathUtils.lerp(p0.x, p1.x, u);
-      const zActual = THREE.MathUtils.lerp(p0.z, p1.z, u);
-      const ySuelo = this.calcularElevacionMonteSharp(xActual, zActual);
-
-      this.astronautaMesh.position.set(xActual, ySuelo + 0.06, zActual);
-
-      const uAdelante = Math.min(1.0, u + 0.1);
-      const xAdelante = THREE.MathUtils.lerp(p0.x, p1.x, uAdelante);
-      const zAdelante = THREE.MathUtils.lerp(p0.z, p1.z, uAdelante);
-      const yAdelante = this.calcularElevacionMonteSharp(xAdelante, zAdelante);
-
-      const dirObjetivo = tieneSiguiente
-        ? new THREE.Vector3(xAdelante - xActual, yAdelante - ySuelo, zAdelante - zActual).normalize()
-        : this.tangenteSuave.clone();
-
-      if (dirObjetivo.lengthSq() > 0.0001) {
-        this.tangenteSuave.lerp(dirObjetivo, 0.15).normalize();
+      // Posición 3D exacta del astronauta sobre el terreno MOLA
+      const pos3D = this.svgA3D(this.posAstroSvg.x, this.posAstroSvg.y);
+      const posMeta3D = this.svgA3D(wpDestino.svgX, wpDestino.svgY);
+      const dirDeseada = new THREE.Vector3().subVectors(posMeta3D, pos3D).normalize();
+      if (dirDeseada.lengthSq() > 0.0001) {
+        this.tangenteSuave.lerp(dirDeseada, 0.14).normalize();
       }
 
-      const anguloGiroY = Math.atan2(this.tangenteSuave.x, this.tangenteSuave.z);
-      this.astronautaMesh.rotation.y = anguloGiroY;
+      this.actorSuperficieGroup.position.set(pos3D.x, pos3D.y + 0.06, pos3D.z);
+      const anguloRumbo = Math.atan2(this.tangenteSuave.x, this.tangenteSuave.z);
+      this.actorSuperficieGroup.rotation.y = anguloRumbo;
+      this.angulosCasco.rumboGrados = Math.round((anguloRumbo * 180) / Math.PI + 360) % 360;
 
-      if (this.flechaTangenteAstro) {
-        this.flechaTangenteAstro.position.set(xActual, ySuelo + 0.65, zActual);
-        this.flechaTangenteAstro.setDirection(this.tangenteSuave);
-      }
-
-      if (enMovimiento) {
-        const freqPaso = 9.0 * Math.sqrt(this.velocidadSimulacion);
-        const osc = Math.sin(tiempoTotal * freqPaso) * 0.5;
+      if (this.caminataActiva) {
+        const osc = Math.sin(tiempoTotal * 8.0) * 0.45;
         this.piernaIzq.rotation.x = osc;
         this.piernaDer.rotation.x = -osc;
-        this.brazoIzq.rotation.x = -osc * 0.75;
-        this.brazoDer.rotation.x = osc * 0.75;
+        this.brazoIzq.rotation.x = -osc * 0.7;
+        this.brazoDer.rotation.x = osc * 0.7;
       } else {
         this.piernaIzq.rotation.x = 0;
         this.piernaDer.rotation.x = 0;
@@ -928,147 +901,88 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
         this.brazoDer.rotation.x = 0;
       }
 
-      this.posVector3D = {
-        x: Math.round(xActual * 16),
-        y: Math.round((ySuelo - 4350) * 10) / 10,
-        z: Math.round(zActual * 16)
-      };
-      this.vectorTangenteHUD = {
-        tx: Math.round(this.tangenteSuave.x * 100) / 100,
-        ty: Math.round(this.tangenteSuave.y * 100) / 100,
-        tz: Math.round(this.tangenteSuave.z * 100) / 100
-      };
+      const anguloCam = anguloRumbo + this.yawMiniOffset;
+      if (!this.vistaPrimeraPersona) {
+        this.actorSuperficieGroup.visible = true;
+        const camX = pos3D.x - Math.sin(anguloCam) * Math.cos(this.pitchMiniOffset) * this.distMini;
+        const camZ = pos3D.z - Math.cos(anguloCam) * Math.cos(this.pitchMiniOffset) * this.distMini;
+        const camY = pos3D.y + Math.sin(this.pitchMiniOffset) * this.distMini + 1.8;
 
-      // CÁMARA INTERACTIVA DERECHA (Permite rotar con el mouse y hacer zoom en Seguimiento 3D o 1ra Persona)
-      const anguloTotalYaw = anguloGiroY + this.hudOrbita.yawOffset;
-      const pitch = this.hudOrbita.pitchOffset;
-
-      if (this.modoVistaDerecha === 'SEGUIMIENTO') {
-        const dist = this.hudOrbita.distancia;
-        const camX = xActual - Math.sin(anguloTotalYaw) * Math.cos(pitch) * dist;
-        const camZ = zActual - Math.cos(anguloTotalYaw) * Math.cos(pitch) * dist;
-        const pisoCam = this.calcularElevacionMonteSharp(camX, camZ);
-        const camY = Math.max(pisoCam + 0.6, ySuelo + 1.2 + Math.sin(pitch) * dist);
-
-        this.cameraHud.position.set(camX, camY, camZ);
-        this.cameraHud.lookAt(xActual + this.tangenteSuave.x * 2.2, ySuelo + 1.0, zActual + this.tangenteSuave.z * 2.2);
+        this.cameraMini.position.lerp(new THREE.Vector3(camX, camY, camZ), 0.14);
+        this.cameraMini.lookAt(pos3D.x + this.tangenteSuave.x * 5.0, pos3D.y + 0.4, pos3D.z + this.tangenteSuave.z * 5.0);
       } else {
-        // Modo 1ra Persona dentro del casco con giro libre de cabeza y zoom óptico
-        const bobV = enMovimiento ? Math.abs(Math.sin(tiempoTotal * 10.0)) * 0.045 : 0;
-        const camX = xActual;
-        const camZ = zActual;
-        const camY = ySuelo + 1.68 + bobV;
-        this.cameraHud.position.set(camX, camY, camZ);
-
-        const miraX = camX + Math.sin(anguloTotalYaw) * Math.cos(pitch) * 18;
-        const miraZ = camZ + Math.cos(anguloTotalYaw) * Math.cos(pitch) * 18;
-        const miraY = camY - Math.sin(pitch) * 12;
-        this.cameraHud.lookAt(miraX, miraY, miraZ);
+        this.actorSuperficieGroup.visible = false;
+        const balanceo = this.caminataActiva ? Math.abs(Math.sin(tiempoTotal * 8.0)) * 0.05 : 0;
+        this.cameraMini.position.set(pos3D.x, pos3D.y + 1.72 + balanceo, pos3D.z);
+        this.cameraMini.lookAt(
+          pos3D.x + Math.sin(anguloCam) * 14,
+          this.calcularElevacionMarteMOLA(pos3D.x + this.tangenteSuave.x * 10, pos3D.z + this.tangenteSuave.z * 10) + 0.8,
+          pos3D.z + Math.cos(anguloCam) * 14
+        );
       }
 
-      this.angulosCasco = {
-        rumboGrados: Math.round((anguloTotalYaw * 180) / Math.PI + 360) % 360,
-        inclinacionGrados: Math.round(Math.asin(this.tangenteSuave.y) * (180 / Math.PI) * 10) / 10
-      };
+      if (this.marcadorAstronautaDerecha) {
+        this.marcadorAstronautaDerecha.position.set(pos3D.x, pos3D.y + 0.9, pos3D.z);
+      }
     }
 
-    // PASADA 1: Renderiza Monitor Izquierdo
-    if (this.rendererBase && this.cameraBase) {
-      this.astronautaMesh.visible = true;
-      this.flechaTangenteAstro.visible = true;
-      this.grupoGrafoOrbital.visible = true;
-      this.grupoVectoresOrbital.visible = true;
-      this.grupoMarcadoresHud.visible = false;
-      this.rendererBase.render(this.scene, this.cameraBase);
+    if (this.rendererMini && this.cameraMini) {
+      this.rendererMini.render(this.sceneMini, this.cameraMini);
     }
-
-    // PASADA 2: Renderiza Visor Derecho (En modo Seguimiento 3D muestra al astronauta caminando; en 1ra Persona oculta el casco para no tapar)
-    if (this.rendererHud && this.cameraHud) {
-      const mostrarCuerpoEnHud = (this.modoVistaDerecha === 'SEGUIMIENTO');
-      this.astronautaMesh.visible = mostrarCuerpoEnHud;
-      this.flechaTangenteAstro.visible = mostrarCuerpoEnHud;
-      this.grupoGrafoOrbital.visible = false;
-      this.grupoVectoresOrbital.visible = false;
-      this.grupoMarcadoresHud.visible = true;
-      this.rendererHud.render(this.scene, this.cameraHud);
+    if (this.rendererMapaNodos && this.cameraMapaNodos) {
+      this.rendererMapaNodos.render(this.sceneMapaNodos, this.cameraMapaNodos);
     }
   }
 
-  cambiarTormenta(valor: number) {
-    const nuevoValor = Number(valor);
-    if (nuevoValor > this.intensidadTormenta) {
-      this.caminataActiva = true;
-    }
-    this.intensidadTormenta = nuevoValor;
-    this.progresoSegmento = 0;
-    this.actualizarRutaYTelemetria();
-  }
-
-  alternarTormentaProgresiva() {
-    this.tormentaProgresivaActiva = !this.tormentaProgresivaActiva;
-    if (this.intervaloTormenta) clearInterval(this.intervaloTormenta);
-
-    if (this.tormentaProgresivaActiva) {
-      if (this.nodoActualId === 'N0' || this.nodoActualId === 'N15') this.nodoActualId = 'N2';
-      this.intensidadTormenta = 12;
-      this.caminataActiva = true;
-      this.progresoSegmento = 0;
-      this.actualizarRutaYTelemetria();
-
-      this.intervaloTormenta = setInterval(() => {
-        if (this.intensidadTormenta < 80) {
-          this.intensidadTormenta += 4;
-        } else {
-          this.intensidadTormenta = 12;
-        }
-        this.actualizarRutaYTelemetria();
-      }, 2200);
-    }
-  }
-
-  alternarTexturaMapa() {
-    this.usarCapaMola = !this.usarCapaMola;
-    if (this.terrenoMesh) {
-      const mat = this.terrenoMesh.material as THREE.MeshStandardMaterial;
-      mat.map = this.usarCapaMola ? this.texturaMola : this.texturaCuriosity;
-      mat.needsUpdate = true;
-    }
-  }
-
-  seleccionarNodoMapa(id: string) {
-    this.nodoActualId = id;
-    this.progresoSegmento = 0;
-    this.actualizarRutaYTelemetria();
-  }
-
-  avanzarPasoAstronauta() {
+  avanzarPasoManual() {
     if (this.datosMision && this.datosMision.ruta_grafo_java && this.datosMision.ruta_grafo_java.length > 1) {
-      this.nodoActualId = this.datosMision.ruta_grafo_java[1].id;
-      this.progresoSegmento = 0;
-      this.actualizarRutaYTelemetria();
+      const sig = this.datosMision.ruta_grafo_java[1];
+      this.posAstroSvg = { x: sig.svgX, y: sig.svgY };
+      this.nodoActualId = sig.id;
+      this.actualizarSistema();
     }
   }
 
-  reiniciarMision() {
-    this.tormentaProgresivaActiva = false;
-    if (this.intervaloTormenta) clearInterval(this.intervaloTormenta);
-    this.nodoActualId = 'N1';
-    this.progresoSegmento = 0;
+  dispararNodoEscapeClima() {
+    if (this.intensidadTormenta < 28) this.intensidadTormenta = 38;
+    this.actualizarSistema();
+  }
+
+  // Al cambiar la radiación (subir o bajar), el astronauta NUNCA se reinicia: recalcula desde donde está parado
+  cambiarTormenta(valor: number) {
+    this.intensidadTormenta = Number(valor);
+    this.actualizarSistema();
+  }
+
+  reiniciarRecorrido() {
     this.intensidadTormenta = 12;
-    this.caminataActiva = true;
-    this.centroOrbitaBase.set(2, 0, 6);
-    this.anguloOrbitaBase.radio = 145;
-    this.actualizarCamaraOrbitalBase();
-    this.recentrarCamaraDerecha();
-    this.actualizarRutaYTelemetria();
+    this.escapeActivo = false;
+    this.nodosEscapeDinamicos = [];
+    this.posAstroSvg = { x: 34, y: 126 };
+    this.nodoActualId = 'N0';
+    this.construirRedCompleta();
+    this.actualizarSistema();
+  }
+
+  private redimensionarVisores() {
+    const divMini = document.getElementById('canvas-mapa-mini');
+    const divDer = document.getElementById('canvas-vision-3d');
+    if (divMini && this.rendererMini && this.cameraMini && divMini.clientWidth > 0) {
+      this.cameraMini.aspect = divMini.clientWidth / divMini.clientHeight;
+      this.cameraMini.updateProjectionMatrix();
+      this.rendererMini.setSize(divMini.clientWidth, divMini.clientHeight);
+    }
+    if (divDer && this.rendererMapaNodos && this.cameraMapaNodos && divDer.clientWidth > 0) {
+      this.cameraMapaNodos.aspect = divDer.clientWidth / divDer.clientHeight;
+      this.cameraMapaNodos.updateProjectionMatrix();
+      this.rendererMapaNodos.setSize(divDer.clientWidth, divDer.clientHeight);
+    }
   }
 
   formatearTiempo(segundos: number): string {
-    if (segundos === undefined || segundos === null) return '0m 00s';
-    const signo = segundos < 0 ? '-' : '';
-    const abs = Math.abs(segundos);
-    const min = Math.floor(abs / 60);
-    const seg = abs % 60;
-    return `${signo}${min}m ${seg < 10 ? '0' : ''}${seg}s`;
+    if (!segundos || segundos <= 0) return '0m 00s';
+    const min = Math.floor(segundos / 60);
+    const seg = segundos % 60;
+    return `${min}m ${seg < 10 ? '0' : ''}${seg}s`;
   }
 }
