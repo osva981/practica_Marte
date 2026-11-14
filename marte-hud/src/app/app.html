@@ -1,8 +1,7 @@
 <div class="marte-app">
-  <!-- BARRA SUPERIOR DE CONTROL EN TIEMPO REAL -->
   <header class="top-bar">
     <div class="titulo">
-      🚀 ARES SAFE-ROUTE 3D | SIMULADOR TOPOGRÁFICO MONTE SHARP
+      🚀 ARES SAFE-ROUTE 3D | VECTORES PREDICTIVOS (20 NODOS)
       <span class="badge-accion" *ngIf="datosMision" [ngClass]="datosMision.alerta_radiacion.codigo_accion">
         {{ datosMision.alerta_radiacion.codigo_accion }}
       </span>
@@ -10,44 +9,84 @@
 
     <div class="controles-demo">
       <div class="slider-box">
-        <label>Tormenta Solar: <strong>{{ intensidadTormenta }}</strong></label>
-        <input type="range" min="10" max="95" step="5" [value]="intensidadTormenta"
+        <label>Onda de Calor: <strong>{{ intensidadTormenta }}</strong></label>
+        <input type="range" min="10" max="90" step="2" [value]="intensidadTormenta"
                (input)="cambiarTormenta($any($event.target).value)" />
       </div>
-      <button (click)="caminataActiva = !caminataActiva" [class.activo]="caminataActiva">
-        {{ caminataActiva ? '⏸️ Pausar Caminata 3D' : '▶️ Caminar en 3D' }}
+
+      <!-- Selector de Velocidad para que la caminata nunca se sienta lenta -->
+      <div class="grupo-velocidad">
+        <span>Velocidad:</span>
+        <button (click)="cambiarVelocidad(1)" [class.activo]="velocidadSimulacion === 1">1x</button>
+        <button (click)="cambiarVelocidad(2.5)" [class.activo]="velocidadSimulacion === 2.5">2.5x</button>
+        <button (click)="cambiarVelocidad(5)" [class.activo]="velocidadSimulacion === 5">5x</button>
+      </div>
+
+      <button (click)="alternarTormentaProgresiva()" [class.peligro]="tormentaProgresivaActiva">
+        {{ tormentaProgresivaActiva ? '⏹️ Detener Onda' : '🌩️ Onda Progresiva' }}
       </button>
-      <button (click)="avanzarPasoAstronauta()" class="btn-accion">⏭️ Siguiente Nodo</button>
-      <button (click)="alternarTexturaMapa()">🗺️ Relieve MOLA / Curiosity</button>
-      <button (click)="reiniciarMision()">🔄 Reiniciar Base</button>
+      <button (click)="caminataActiva = !caminataActiva" [class.activo]="caminataActiva">
+        {{ caminataActiva ? '⏸️ Pausar' : '▶️ Caminar' }}
+      </button>
+      <button (click)="alternarTexturaMapa()">🗺️ Capa MOLA</button>
+      <button (click)="reiniciarMision()">🔄 Reiniciar</button>
     </div>
   </header>
 
   <main class="grid-pantallas">
-    <!-- 1. MONITOR DE BASE: MODELO DE ELEVACIÓN DIGITAL 3D INTERACTIVO -->
+    <!-- 1. MONITOR DE BASE 3D (IZQUIERDA) -->
     <section class="panel-base">
-      <h2>1. MODELO 3D MONTE SHARP Y GRAFO JAVA (ARRASTRA CON EL MOUSE PARA ROTAR LA MONTAÑA EN 3D)</h2>
+      <h2>1. MODELO 3D MONTE SHARP Y ONDA DE CALOR (ARRASTRA Y USA LA RUEDA DEL MOUSE)</h2>
       <div class="visor-3d-wrapper">
         <div id="canvas-base-3d" class="lienzo-3d"></div>
+
+        <!-- Botones de Zoom y Enfoque para el Mapa Izquierdo -->
+        <div class="controles-visor-flotantes">
+          <button (click)="ajustarZoomIzquierda(-22)" title="Acercar Mapa">🔍 +</button>
+          <button (click)="ajustarZoomIzquierda(22)" title="Alejar Mapa">🔍 -</button>
+          <button (click)="enfocarAstronautaIzquierda()" title="Enfocar Astronauta">🎯 Seguir Astronauta</button>
+        </div>
+
         <div class="overlay-vector">
-          Vector Posición 3D r(t): &lt;{{ posVector3D.x }}, {{ posVector3D.y }}m, {{ posVector3D.z }}&gt;
+          Posición r(t): &lt;{{ posVector3D.x }}m, {{ posVector3D.y }}m, {{ posVector3D.z }}m&gt; |
+          Tangente T(t): &lt;{{ vectorTangenteHUD.tx }}, {{ vectorTangenteHUD.ty }}, {{ vectorTangenteHUD.tz }}&gt;
         </div>
       </div>
 
       <div class="telemetria-grid" *ngIf="datosMision">
-        <div class="card"><span>Distancia Geodésica 3D:</span> <strong>{{ datosMision.calculos_fisicos.distancia_total_m }} m (Δh +{{ datosMision.calculos_fisicos.desnivel_positivo_m }}m)</strong></div>
+        <div class="card"><span>Distancia Restante:</span> <strong>{{ datosMision.calculos_fisicos.distancia_total_m }} m (Δh +{{ datosMision.calculos_fisicos.desnivel_positivo_m }}m)</strong></div>
         <div class="card"><span>Velocidad Tobler / Rampa:</span> <strong>{{ datosMision.calculos_fisicos.velocidad_real_m_s }} m/s ({{ datosMision.calculos_fisicos.pendiente_promedio_grados }}°)</strong></div>
         <div class="card"><span>Dosimetría RAD / Límite:</span> <strong>{{ datosMision.calculos_fisicos.dosis_traje_uSv_h }} µSv/h ({{ datosMision.calculos_fisicos.porcentaje_limite_nasa }}% máx)</strong></div>
         <div class="card"><span>Metabolismo / Consumo O2:</span> <strong>{{ datosMision.calculos_fisicos.esfuerzo_metabolico_w }} W | {{ datosMision.calculos_fisicos.consumo_o2_l_min }} L/min ({{ datosMision.calculos_fisicos.ritmo_cardiaco_bpm }} bpm)</strong></div>
       </div>
     </section>
 
-    <!-- 2. DISPOSITIVO PORTÁTIL DE BRAZO (NODOS INTERACTIVOS DEL GRAFO) -->
+    <!-- 2. DISPOSITIVO DE BRAZO CON EVALUACIÓN PREDICTIVA -->
     <section class="panel-pdr" *ngIf="datosMision">
-      <h2>2. NAVEGADOR DE BRAZO PDR (CLIC EN CUALQUIER NODO PARA SALTAR A ESA CURVA)</h2>
+      <h2>2. EVALUADOR PREDICTIVO DE TIEMPO (IMPACTO SOLAR EN: {{ formatearTiempo(datosMision.alerta_radiacion.tiempo_para_impacto_seg) }})</h2>
+
+      <div class="tabla-predictiva" *ngIf="datosMision.evaluacion_predictiva">
+        <div class="fila-pred">
+          <span>1. Ruta Cima Directa (ETA {{ formatearTiempo(datosMision.evaluacion_predictiva.eta_cima_seg) }}):</span>
+          <strong [class.viable]="datosMision.evaluacion_predictiva.cima_viable" [class.no-viable]="!datosMision.evaluacion_predictiva.cima_viable">
+            {{ datosMision.evaluacion_predictiva.cima_viable ? '✅ SÍ ALCANZA' : '❌ NO ALCANZA (CAMBIAR RUTA)' }}
+          </strong>
+        </div>
+        <div class="fila-pred">
+          <span>2. Desvío Cañones S1-S4 (ETA {{ formatearTiempo(datosMision.evaluacion_predictiva.eta_desvio_seg) }}):</span>
+          <strong [class.viable]="datosMision.evaluacion_predictiva.desvio_viable" [class.no-viable]="!datosMision.evaluacion_predictiva.desvio_viable">
+            {{ datosMision.evaluacion_predictiva.desvio_viable ? '✅ SÍ ALCANZA (PROTEGIDO)' : '❌ NO ALCANZA (ABORTAR)' }}
+          </strong>
+        </div>
+        <div class="fila-pred">
+          <span>3. Retorno a Base N0 (ETA {{ formatearTiempo(datosMision.evaluacion_predictiva.eta_retorno_seg) }}):</span>
+          <strong class="viable">✅ RUTA DE REGRESO SEGURA</strong>
+        </div>
+      </div>
+
       <div class="reloj-arm-pad">
         <div class="pdr-header">
-          NODO ACTUAL: {{ nodoActualId }} ➔ PRÓXIMO: {{ datosMision.siguiente_waypoint }}
+          NODO ACTUAL: {{ nodoActualId }} ➔ SIGUIENTE PASO: {{ datosMision.siguiente_waypoint }}
         </div>
         <ul class="lista-nodos">
           <li *ngFor="let nodo of datosMision.ruta_grafo_java; let i = index"
@@ -55,34 +94,40 @@
               [class.nodo-refugio-li]="nodo.tipo === 'REFUGIO'">
             <span class="badge-nodo">{{ i === 0 ? '🚶' : nodo.id }}</span>
             <strong>{{ nodo.nombre }}</strong>
-            <small> | {{ nodo.altitud }}m | {{ nodo.pendiente }}° | {{ nodo.rad_nodo }} µSv/h</small>
+            <small> | {{ nodo.altitud }}m | {{ nodo.rad_nodo }} µSv/h</small>
           </li>
         </ul>
-        <div class="pdr-footer">
-          <div>O2 TRAJE: <strong>{{ datosMision.calculos_fisicos.oxigeno_pct }}%</strong></div>
-          <div>ETA DESTINO: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong></div>
-        </div>
       </div>
     </section>
 
-    <!-- 3. SIMULADOR DE CASCO EN PRIMERA PERSONA CAMINANDO POR LA MONTAÑA 3D -->
+    <!-- 3. VISOR INTERACTIVO DERECHO (CON ZOOM DE RUEDA, GIRO 360° Y CAMBIO DE CÁMARA) -->
     <section class="panel-hud">
-      <h2>3. VISOR AR CASCO EN PRIMERA PERSONA (RUMBO: {{ angulosCasco.rumboGrados }}° | INCLINACIÓN: {{ angulosCasco.inclinacionGrados }}°)</h2>
+      <h2>3. VISOR TÁCTICO Y CASCO AR (ARRASTRA PARA ACOMODAR ÁNGULO | RUEDA = ZOOM {{ nivelZoomDerecha }}%)</h2>
       <div class="visor-3d-wrapper marco-casco">
-        <!-- Cámara WebGL en primera persona sobre la superficie 3D del Monte Sharp -->
         <div id="canvas-hud-3d" class="lienzo-3d"></div>
 
-        <!-- Brújula y mira holográfica del casco -->
-        <div class="hud-brujula">N {{ angulosCasco.rumboGrados }}° E | PENDIENTE {{ angulosCasco.inclinacionGrados }}°</div>
+        <!-- Barra de Controles de Zoom y Cámara para acomodar la pantalla derecha -->
+        <div class="controles-visor-flotantes">
+          <button (click)="ajustarZoomDerecha(-2.0)" title="Acercar Zoom">🔍 Zoom +</button>
+          <button (click)="ajustarZoomDerecha(2.0)" title="Alejar Zoom">🔍 Zoom -</button>
+          <button (click)="alternarModoVistaDerecha()" class="btn-camara">
+            {{ modoVistaDerecha === 'SEGUIMIENTO' ? '👁️ Cambiar a 1ra Persona' : '🛰️ Cambiar a Seguimiento 3D' }}
+          </button>
+          <button (click)="recentrarCamaraDerecha()" title="Acomodar al frente">🎯 Recentrar</button>
+        </div>
+
+        <div class="hud-brujula">
+          N {{ angulosCasco.rumboGrados }}° E | PENDIENTE {{ angulosCasco.inclinacionGrados }}° | ZOOM {{ nivelZoomDerecha }}%
+        </div>
 
         <div class="hud-alerta" *ngIf="datosMision" [ngClass]="'alerta-' + datosMision.alerta_radiacion.codigo_accion">
-          ⚠️ {{ datosMision.alerta_radiacion.mensaje_hud }}
+          {{ datosMision.alerta_radiacion.mensaje_hud }}
         </div>
 
         <div class="hud-timers" *ngIf="datosMision">
-          <div>FRENTE SOLAR EN: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_para_impacto_seg) }}</strong></div>
-          <div>MARGEN VITAL: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.margen_supervivencia_seg) }}</strong></div>
-          <div>DOSIS ACUMULADA: <strong>{{ datosMision.calculos_fisicos.dosis_acumulada_uSv }} µSv</strong></div>
+          <div>IMPACTO RADIACIÓN EN: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_para_impacto_seg) }}</strong></div>
+          <div>TIEMPO RUTA ACTIVA: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong></div>
+          <div>VENTANA DE SUPERVIVENCIA: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.margen_supervivencia_seg) }}</strong></div>
         </div>
       </div>
     </section>
