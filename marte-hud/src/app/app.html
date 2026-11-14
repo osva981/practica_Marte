@@ -1,90 +1,149 @@
 <div class="marte-app">
-  <!-- BARRA SUPERIOR DE CONTROL EN TIEMPO REAL -->
-  <header class="top-bar">
-    <div class="titulo">
-      🚀 ARES SAFE-ROUTE 3D | SIMULADOR TOPOGRÁFICO MONTE SHARP
-      <span class="badge-accion" *ngIf="datosMision" [ngClass]="datosMision.alerta_radiacion.codigo_accion">
-        {{ datosMision.alerta_radiacion.codigo_accion }}
-      </span>
-    </div>
-
-    <div class="controles-demo">
-      <div class="slider-box">
-        <label>Tormenta Solar: <strong>{{ intensidadTormenta }}</strong></label>
-        <input type="range" min="10" max="95" step="5" [value]="intensidadTormenta"
-               (input)="cambiarTormenta($any($event.target).value)" />
+  <!-- ZONA SUPERIOR: dos paneles grandes -->
+  <main class="top-zone">
+    <!-- Panel izquierdo: Mapa Mini -->
+    <section class="panel panel-mapa chamfer">
+      <div class="panel-header">
+        <span class="panel-icon"><i class="fas fa-map"></i></span>
+        <span class="panel-title">Mapa Mini</span>
       </div>
-      <button (click)="caminataActiva = !caminataActiva" [class.activo]="caminataActiva">
-        {{ caminataActiva ? '⏸️ Pausar Caminata 3D' : '▶️ Caminar en 3D' }}
-      </button>
-      <button (click)="avanzarPasoAstronauta()" class="btn-accion">⏭️ Siguiente Nodo</button>
-      <button (click)="alternarTexturaMapa()">🗺️ Relieve MOLA / Curiosity</button>
-      <button (click)="reiniciarMision()">🔄 Reiniciar Base</button>
-    </div>
-  </header>
-
-  <main class="grid-pantallas">
-    <!-- 1. MONITOR DE BASE: MODELO DE ELEVACIÓN DIGITAL 3D INTERACTIVO -->
-    <section class="panel-base">
-      <h2>1. MODELO 3D MONTE SHARP Y GRAFO JAVA (ARRASTRA CON EL MOUSE PARA ROTAR LA MONTAÑA EN 3D)</h2>
-      <div class="visor-3d-wrapper">
+      <div class="visor-3d-wrapper mapa-wrapper">
         <div id="canvas-base-3d" class="lienzo-3d"></div>
+        <div class="brujula">
+          <span>N</span>
+        </div>
         <div class="overlay-vector">
-          Vector Posición 3D r(t): &lt;{{ posVector3D.x }}, {{ posVector3D.y }}m, {{ posVector3D.z }}&gt;
+          r(t): &lt;{{ posVector3D.x }}, {{ posVector3D.y }}m, {{ posVector3D.z }}&gt;
         </div>
       </div>
-
-      <div class="telemetria-grid" *ngIf="datosMision">
-        <div class="card"><span>Distancia Geodésica 3D:</span> <strong>{{ datosMision.calculos_fisicos.distancia_total_m }} m (Δh +{{ datosMision.calculos_fisicos.desnivel_positivo_m }}m)</strong></div>
-        <div class="card"><span>Velocidad Tobler / Rampa:</span> <strong>{{ datosMision.calculos_fisicos.velocidad_real_m_s }} m/s ({{ datosMision.calculos_fisicos.pendiente_promedio_grados }}°)</strong></div>
-        <div class="card"><span>Dosimetría RAD / Límite:</span> <strong>{{ datosMision.calculos_fisicos.dosis_traje_uSv_h }} µSv/h ({{ datosMision.calculos_fisicos.porcentaje_limite_nasa }}% máx)</strong></div>
-        <div class="card"><span>Metabolismo / Consumo O2:</span> <strong>{{ datosMision.calculos_fisicos.esfuerzo_metabolico_w }} W | {{ datosMision.calculos_fisicos.consumo_o2_l_min }} L/min ({{ datosMision.calculos_fisicos.ritmo_cardiaco_bpm }} bpm)</strong></div>
-      </div>
-    </section>
-
-    <!-- 2. DISPOSITIVO PORTÁTIL DE BRAZO (NODOS INTERACTIVOS DEL GRAFO) -->
-    <section class="panel-pdr" *ngIf="datosMision">
-      <h2>2. NAVEGADOR DE BRAZO PDR (CLIC EN CUALQUIER NODO PARA SALTAR A ESA CURVA)</h2>
-      <div class="reloj-arm-pad">
-        <div class="pdr-header">
-          NODO ACTUAL: {{ nodoActualId }} ➔ PRÓXIMO: {{ datosMision.siguiente_waypoint }}
+      <div class="controles-demo">
+        <div class="slider-box">
+          <label>Tormenta: <strong>{{ intensidadTormenta }}</strong></label>
+          <input type="range" min="10" max="95" step="5" [value]="intensidadTormenta"
+                 (input)="cambiarTormenta($any($event.target).value)" />
         </div>
-        <ul class="lista-nodos">
-          <li *ngFor="let nodo of datosMision.ruta_grafo_java; let i = index"
-              (click)="seleccionarNodoMapa(nodo.id)"
-              [class.nodo-refugio-li]="nodo.tipo === 'REFUGIO'">
-            <span class="badge-nodo">{{ i === 0 ? '🚶' : nodo.id }}</span>
-            <strong>{{ nodo.nombre }}</strong>
-            <small> | {{ nodo.altitud }}m | {{ nodo.pendiente }}° | {{ nodo.rad_nodo }} µSv/h</small>
-          </li>
-        </ul>
-        <div class="pdr-footer">
-          <div>O2 TRAJE: <strong>{{ datosMision.calculos_fisicos.oxigeno_pct }}%</strong></div>
-          <div>ETA DESTINO: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong></div>
-        </div>
+        <button (click)="caminataActiva = !caminataActiva" [class.activo]="caminataActiva">
+          <i class="fas" [ngClass]="caminataActiva ? 'fa-pause' : 'fa-play'"></i>
+          {{ caminataActiva ? 'Pausar' : 'Caminar' }}
+        </button>
+        <button (click)="avanzarPasoAstronauta()" class="btn-accion"><i class="fas fa-forward-step"></i> Siguiente</button>
+        <button (click)="alternarTexturaMapa()"><i class="fas fa-layer-group"></i> MOLA/Curiosity</button>
+        <button (click)="reiniciarMision()"><i class="fas fa-rotate-right"></i> Reiniciar</button>
       </div>
     </section>
 
-    <!-- 3. SIMULADOR DE CASCO EN PRIMERA PERSONA CAMINANDO POR LA MONTAÑA 3D -->
-    <section class="panel-hud">
-      <h2>3. VISOR AR CASCO EN PRIMERA PERSONA (RUMBO: {{ angulosCasco.rumboGrados }}° | INCLINACIÓN: {{ angulosCasco.inclinacionGrados }}°)</h2>
-      <div class="visor-3d-wrapper marco-casco">
-        <!-- Cámara WebGL en primera persona sobre la superficie 3D del Monte Sharp -->
+    <!-- Panel derecho: Visión 3D - Monte Sharp -->
+    <section class="panel panel-vision chamfer">
+      <div class="panel-header">
+        <span class="panel-icon"><i class="fas fa-mountain"></i></span>
+        <span class="panel-title">Visión 3D - Monte Sharp</span>
+      </div>
+      <div class="visor-3d-wrapper vision-wrapper">
         <div id="canvas-hud-3d" class="lienzo-3d"></div>
-
-        <!-- Brújula y mira holográfica del casco -->
         <div class="hud-brujula">N {{ angulosCasco.rumboGrados }}° E | PENDIENTE {{ angulosCasco.inclinacionGrados }}°</div>
-
         <div class="hud-alerta" *ngIf="datosMision" [ngClass]="'alerta-' + datosMision.alerta_radiacion.codigo_accion">
-          ⚠️ {{ datosMision.alerta_radiacion.mensaje_hud }}
+          <i class="fas fa-triangle-exclamation"></i> {{ datosMision.alerta_radiacion.mensaje_hud }}
         </div>
-
         <div class="hud-timers" *ngIf="datosMision">
-          <div>FRENTE SOLAR EN: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_para_impacto_seg) }}</strong></div>
+          <div>FRENTE SOLAR: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_para_impacto_seg) }}</strong></div>
           <div>MARGEN VITAL: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.margen_supervivencia_seg) }}</strong></div>
-          <div>DOSIS ACUMULADA: <strong>{{ datosMision.calculos_fisicos.dosis_acumulada_uSv }} µSv</strong></div>
+          <div>DOSIS: <strong>{{ datosMision.calculos_fisicos.dosis_acumulada_uSv }} µSv</strong></div>
         </div>
       </div>
     </section>
   </main>
+
+  <!-- ZONA INFERIOR: panel horizontal dividido -->
+  <section class="panel panel-inferior chamfer">
+    <div class="inferior-grid">
+      <!-- Instrucciones -->
+      <div class="col-instrucciones">
+        <div class="panel-header">
+          <span class="panel-icon"><i class="fas fa-book"></i></span>
+          <span class="panel-title">Instrucciones</span>
+        </div>
+        <ol class="lista-instrucciones">
+          <li>Usa los botones para avanzar en el simulador.</li>
+          <li>Observa el mapa y sigue la ruta.</li>
+          <li>Completa los nodos para explorar Monte Sharp.</li>
+        </ol>
+      </div>
+      <!-- Separador vertical dorado -->
+      <div class="separador-vertical"></div>
+      <!-- Datos de la Ruta -->
+      <div class="col-datos">
+        <div class="panel-header">
+          <span class="panel-icon"><i class="fas fa-chart-bar"></i></span>
+          <span class="panel-title">Datos de la Ruta</span>
+        </div>
+        <div class="metricas" *ngIf="datosMision">
+          <div class="metrica">
+            <span class="metrica-icon"><i class="fas fa-ruler"></i></span>
+            <div class="metrica-texto">
+              <span class="metrica-label">Distancia Total</span>
+              <strong class="metrica-valor">{{ datosMision.calculos_fisicos.distancia_total_m }} m</strong>
+            </div>
+          </div>
+          <div class="metrica">
+            <span class="metrica-icon"><i class="fas fa-bolt"></i></span>
+            <div class="metrica-texto">
+              <span class="metrica-label">Velocidad</span>
+              <strong class="metrica-valor">{{ datosMision.calculos_fisicos.velocidad_real_m_s }} m/s</strong>
+            </div>
+          </div>
+          <div class="metrica">
+            <span class="metrica-icon"><i class="fas fa-clock"></i></span>
+            <div class="metrica-texto">
+              <span class="metrica-label">ETA Estimado</span>
+              <strong class="metrica-valor">{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="metricas" *ngIf="!datosMision">
+          <div class="metrica">
+            <span class="metrica-icon"><i class="fas fa-ruler"></i></span>
+            <div class="metrica-texto">
+              <span class="metrica-label">Distancia Total</span>
+              <strong class="metrica-valor">289.22 m</strong>
+            </div>
+          </div>
+          <div class="metrica">
+            <span class="metrica-icon"><i class="fas fa-bolt"></i></span>
+            <div class="metrica-texto">
+              <span class="metrica-label">Velocidad</span>
+              <strong class="metrica-valor">0.62 m/s</strong>
+            </div>
+          </div>
+          <div class="metrica">
+            <span class="metrica-icon"><i class="fas fa-clock"></i></span>
+            <div class="metrica-texto">
+              <span class="metrica-label">ETA Estimado</span>
+              <strong class="metrica-valor">78m 49s</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Panel PDR (nodos) -->
+  <section class="panel panel-pdr chamfer" *ngIf="datosMision">
+    <div class="panel-header">
+      <span class="panel-icon"><i class="fas fa-compass"></i></span>
+      <span class="panel-title">Nodos — {{ nodoActualId }} ➔ {{ datosMision.siguiente_waypoint }}</span>
+    </div>
+    <ul class="lista-nodos">
+      <li *ngFor="let nodo of datosMision.ruta_grafo_java; let i = index"
+          (click)="seleccionarNodoMapa(nodo.id)"
+          [class.nodo-refugio-li]="nodo.tipo === 'REFUGIO'">
+        <span class="badge-nodo">{{ i === 0 ? '' : nodo.id }}<i *ngIf="i === 0" class="fas fa-person-walking"></i></span>
+        <strong>{{ nodo.nombre }}</strong>
+        <small> | {{ nodo.altitud }}m | {{ nodo.pendiente }}° | {{ nodo.rad_nodo }} µSv/h</small>
+      </li>
+    </ul>
+    <div class="pdr-footer">
+      <div>O2 TRAJE: <strong>{{ datosMision.calculos_fisicos.oxigeno_pct }}%</strong></div>
+      <div>ETA: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong></div>
+    </div>
+  </section>
 </div>

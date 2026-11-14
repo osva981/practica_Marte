@@ -1,6 +1,8 @@
-import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, ChangeDetectorRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import * as THREE from 'three';
+import { BackendService } from './backend.service';
+import { RespuestaPython } from './backend-types';
 
 @Component({
   selector: 'app-root',
@@ -14,7 +16,9 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   intensidadTormenta: number = 12;
   nodoActualId: string = 'N0';
   caminataActiva: boolean = true;
-  datosMision: any = null;
+  datosMision: RespuestaPython | null = null;
+  cargando: boolean = false;
+  errorBackend: string | null = null;
 
   // Variables de cinemática vectorial r(t) en 3D
   progresoTramo: number = 0; // Parámetro t en [0, 1] entre el nodo actual y el siguiente
@@ -48,6 +52,7 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   private anguloOrbita = { theta: 0.15, phi: 0.85, radio: 155 };
 
   constructor(private cdr: ChangeDetectorRef) {}
+  private backend = inject(BackendService);
 
   ngOnInit() {
     this.consultarBackendPython();
@@ -67,16 +72,19 @@ export class App implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async consultarBackendPython() {
+    this.cargando = true;
+    this.errorBackend = null;
     try {
-      const url = `http://localhost:8080/api/telemetria-marte?intensidad_tormenta=${this.intensidadTormenta}&nodo_actual=${this.nodoActualId}`;
-      const res = await fetch(url);
-      const json = await res.json();
+      const json = await this.backend.consultarPython(this.intensidadTormenta, this.nodoActualId);
       if (json && json.ruta_grafo_java) {
         this.datosMision = json;
         this.reconstruirGrafoYRuta3D();
       }
-    } catch (e) {
+    } catch (e: any) {
+      this.errorBackend = e?.message ?? 'Error al consultar backend';
       console.error('Verifica que Java (8081) y Python (8080) estén activos', e);
+    } finally {
+      this.cargando = false;
     }
     this.cdr.detectChanges();
   }

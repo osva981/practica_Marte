@@ -1,47 +1,270 @@
-.marte-app { background: #0b0f17; color: #e2e8f0; min-height: 100vh; font-family: 'Segoe UI', sans-serif; padding: 10px; }
-.top-bar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; background: #161f30; padding: 10px 16px; border-radius: 8px; border: 1px solid #2d3d5b; margin-bottom: 12px; }
-.titulo { font-weight: bold; color: #38bdf8; font-size: 14px; display: flex; align-items: center; gap: 10px; }
-.badge-accion { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; }
-.badge-accion.AVANZAR { background: #10b981; color: #fff; }
-.badge-accion.DESVIO { background: #38bdf8; color: #000; }
-.badge-accion.REGRESAR, .badge-accion.REFUGIO { background: #ef4444; color: #fff; animation: parpadeo 1s infinite; }
+/* ===== Tema HUD futurista / militar-espacial ===== */
+.marte-app {
+  background: #050505;
+  color: #e8e8e8;
+  min-height: 100vh;
+  font-family: 'Inter', 'Roboto', 'Segoe UI', sans-serif;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
-.controles-demo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.slider-box { display: flex; align-items: center; gap: 6px; background: #1e293b; padding: 5px 10px; border-radius: 6px; font-size: 12px; }
-.controles-demo button { padding: 7px 12px; border-radius: 6px; border: none; cursor: pointer; font-weight: bold; font-size: 12px; background: #334155; color: white; }
-.controles-demo button.btn-accion { background: #2563eb; }
-.controles-demo button.activo { background: #10b981; }
+/* Chamfer (cortes diagonales en esquinas) */
+.chamfer {
+  clip-path: polygon(
+    12px 0, calc(100% - 12px) 0, 100% 12px,
+    100% calc(100% - 12px), calc(100% - 12px) 100%,
+    12px 100%, 0 calc(100% - 12px), 0 12px
+  );
+}
 
-.grid-pantallas { display: grid; grid-template-columns: 1.3fr 0.95fr 1.25fr; gap: 12px; }
-section { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 12px; }
-h2 { font-size: 11.5px; color: #94a3b8; margin-top: 0; border-bottom: 1px solid #1f2937; padding-bottom: 6px; }
+/* Panel base */
+.panel {
+  background: #0a0a0a;
+  border: 2px solid #FFB000;
+  box-shadow: 0 0 12px rgba(255, 195, 0, 0.35), inset 0 0 8px rgba(255, 195, 0, 0.08);
+  border-radius: 4px;
+  padding: 10px;
+}
 
-.visor-3d-wrapper { position: relative; width: 100%; height: 280px; border-radius: 8px; overflow: hidden; border: 1px solid #374151; background: #000; }
+/* Cabecera tipo píldora */
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #111;
+  border: 1px solid #FFC300;
+  border-radius: 20px;
+  padding: 4px 12px;
+  margin-bottom: 8px;
+  width: fit-content;
+}
+.panel-icon { color: #FFC300; font-size: 14px; }
+.panel-title {
+  color: #FFC300;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Zona superior */
+.top-zone {
+  display: grid;
+  grid-template-columns: 1.8fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 900px) {
+  .top-zone { grid-template-columns: 1fr; }
+}
+
+/* Visores 3D */
+.visor-3d-wrapper {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid #3a2a00;
+  background: #000;
+}
+.mapa-wrapper { height: 340px; }
+.vision-wrapper { height: 340px; }
 .lienzo-3d { width: 100%; height: 100%; cursor: grab; }
 .lienzo-3d:active { cursor: grabbing; }
 
-.marco-casco { border: 2px solid rgba(56, 189, 248, 0.45); box-shadow: inset 0 0 35px rgba(0, 255, 136, 0.18); border-radius: 18px; }
-.overlay-vector { position: absolute; bottom: 8px; left: 8px; background: rgba(15, 23, 42, 0.85); color: #38bdf8; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; pointer-events: none; }
-.hud-brujula { position: absolute; top: 42px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.65); border: 1px solid rgba(0, 255, 136, 0.5); color: #00ff88; padding: 2px 10px; border-radius: 12px; font-size: 10px; font-family: monospace; pointer-events: none; }
+/* Brújula circular */
+.brujula {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 2px solid #FFC300;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFC300;
+  font-weight: 800;
+  font-size: 16px;
+  box-shadow: 0 0 8px rgba(255, 195, 0, 0.5);
+}
+.overlay-vector {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  background: rgba(10, 10, 10, 0.85);
+  color: #FFC300;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: monospace;
+  pointer-events: none;
+}
 
+/* Controles */
+.controles-demo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.slider-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #141414;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  border: 1px solid #3a2a00;
+}
+.controles-demo button {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #FFB000;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 11px;
+  background: #1a1400;
+  color: #FFC300;
+}
+.controles-demo button.btn-accion { background: #FFB000; color: #000; }
+.controles-demo button.activo { background: #3CFF5A; color: #000; border-color: #3CFF5A; }
+
+/* HUD casco overlays */
+.hud-brujula {
+  position: absolute;
+  top: 42px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid #FFC300;
+  color: #FFC300;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-family: monospace;
+  pointer-events: none;
+}
+.hud-alerta {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+  text-align: center;
+  color: #fff;
+  pointer-events: none;
+  background: rgba(200, 50, 0, 0.85);
+  border: 1px solid #FFB000;
+}
+.hud-timers {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid #FFC300;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  color: #FFC300;
+  pointer-events: none;
+}
+
+/* Panel inferior */
+.panel-inferior { padding: 12px; }
+.inferior-grid {
+  display: grid;
+  grid-template-columns: 1fr 2px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+@media (max-width: 700px) {
+  .inferior-grid { grid-template-columns: 1fr; }
+  .separador-vertical { display: none; }
+}
+.separador-vertical {
+  background: linear-gradient(to bottom, transparent, #FFC300, transparent);
+  width: 2px;
+  min-height: 80px;
+}
+.col-instrucciones, .col-datos { padding: 4px; }
+.lista-instrucciones {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0 0;
+  color: #ddd;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.lista-instrucciones li { padding-left: 4px; }
+
+/* Métricas */
+.metricas { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.metrica {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #141414;
+  border: 1px solid #3a2a00;
+  border-radius: 4px;
+  padding: 8px;
+}
+.metrica-icon { font-size: 20px; }
+.metrica-texto { display: flex; flex-direction: column; }
+.metrica-label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
+.metrica-valor { font-size: 16px; color: #FFC300; font-weight: 800; }
+
+/* Panel PDR */
+.panel-pdr { }
+.lista-nodos { list-style: none; padding: 0; margin: 0; max-height: 180px; overflow-y: auto; }
+.lista-nodos li {
+  background: #141414;
+  margin-bottom: 5px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  border-left: 3px solid #3CFF5A;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.lista-nodos li:hover { background: #1f1a00; }
+.lista-nodos li.nodo-refugio-li { border-left-color: #2F6BFF; background: #0a0a1a; }
+.badge-nodo {
+  background: #FFC300;
+  color: #000;
+  font-weight: bold;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-right: 5px;
+}
+.pdr-footer {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  border-top: 1px solid #3a2a00;
+  padding-top: 8px;
+  color: #FFC300;
+}
+
+/* Badge acción */
+.badge-accion { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 800; }
+.badge-accion.AVANZAR { background: #3CFF5A; color: #000; }
+.badge-accion.DESVIO { background: #2F6BFF; color: #fff; }
+.badge-accion.REGRESAR, .badge-accion.REFUGIO { background: #ff3b00; color: #fff; }
+
+/* Telemetría grid (mantener por compatibilidad) */
 .telemetria-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-.card { background: #1e293b; padding: 8px; border-radius: 6px; font-size: 11px; display: flex; flex-direction: column; }
-.card strong { font-size: 13px; color: #38bdf8; margin-top: 3px; }
-
-.reloj-arm-pad { background: #090d14; border: 2px solid #334155; border-radius: 12px; padding: 10px; }
-.pdr-header { color: #38bdf8; font-weight: bold; font-size: 11px; margin-bottom: 8px; }
-.lista-nodos { list-style: none; padding: 0; margin: 0; max-height: 205px; overflow-y: auto; }
-.lista-nodos li { background: #162032; margin-bottom: 5px; padding: 6px 8px; border-radius: 5px; font-size: 11px; border-left: 3px solid #00ff88; cursor: pointer; transition: 0.2s; }
-.lista-nodos li:hover { background: #1e293b; }
-.lista-nodos li.nodo-refugio-li { border-left-color: #38bdf8; background: #122438; }
-.badge-nodo { background: #00ff88; color: #000; font-weight: bold; padding: 1px 5px; border-radius: 4px; margin-right: 5px; }
-.pdr-footer { margin-top: 8px; display: flex; justify-content: space-between; font-size: 12px; border-top: 1px solid #1e293b; padding-top: 8px; }
-
-.hud-alerta { position: absolute; top: 8px; left: 8px; right: 8px; padding: 5px 8px; border-radius: 6px; font-size: 10px; font-weight: bold; text-align: center; color: #fff; pointer-events: none; }
-.alerta-AVANZAR { background: rgba(16, 185, 129, 0.85); }
-.alerta-DESVIO { background: rgba(2, 132, 199, 0.9); }
-.alerta-REGRESAR, .alerta-REFUGIO { background: rgba(220, 38, 38, 0.92); animation: parpadeo 1s infinite; }
-
-.hud-timers { position: absolute; bottom: 8px; right: 8px; background: rgba(0, 0, 0, 0.8); border: 1px solid #00ff88; padding: 6px 10px; border-radius: 6px; font-size: 10.5px; color: #00ff88; pointer-events: none; }
+.card { background: #141414; padding: 8px; border-radius: 4px; font-size: 11px; display: flex; flex-direction: column; border: 1px solid #3a2a00; }
+.card strong { font-size: 13px; color: #FFC300; margin-top: 3px; }
 
 @keyframes parpadeo { 50% { opacity: 0.55; } }
