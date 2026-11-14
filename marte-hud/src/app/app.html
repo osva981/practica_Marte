@@ -1,149 +1,116 @@
-<div class="marte-app">
-  <!-- ZONA SUPERIOR: dos paneles grandes -->
-  <main class="top-zone">
-    <!-- Panel izquierdo: Mapa Mini -->
-    <section class="panel panel-mapa chamfer">
-      <div class="panel-header">
-        <span class="panel-icon"><i class="fas fa-map"></i></span>
-        <span class="panel-title">Mapa Mini</span>
-      </div>
-      <div class="visor-3d-wrapper mapa-wrapper">
-        <div id="canvas-base-3d" class="lienzo-3d"></div>
-        <div class="brujula">
-          <span>N</span>
+<div class="hud-marco-exterior">
+  <div class="hud-contenedor-dorado">
+
+    <!-- FILA SUPERIOR: VISOR DE SUPERFICIE (IZQUIERDA) + MAPA MOLA DE CRÁTERES Y NODOS (DERECHA) -->
+    <div class="hud-fila-superior">
+
+      <!-- PANEL IZQUIERDO: CAMINATA EN SUPERFICIE / 1RA PERSONA -->
+      <div class="panel-dorado panel-mapa-mini">
+        <div class="etiqueta-superior-izq">
+          <span class="icono-pin">📍</span>
+          <span>{{ vistaPrimeraPersona ? 'Visor Casco 1ra Persona' : 'Mapa Mini - Superficie' }}</span>
         </div>
-        <div class="overlay-vector">
-          r(t): &lt;{{ posVector3D.x }}, {{ posVector3D.y }}m, {{ posVector3D.z }}&gt;
+
+        <div class="brujula-norte" [style.transform]="'rotate(' + (-angulosCasco.rumboGrados) + 'deg)'">
+          <span class="letra-n">N</span>
+          <div class="flecha-norte"></div>
+        </div>
+
+        <div id="canvas-mapa-mini" class="lienzo-visor"></div>
+
+        <div class="controles-mini-flotantes">
+          <button (click)="avanzarPasoManual()" class="btn-dorado">⏭️ Avanzar Nodo</button>
+          <button (click)="caminataActiva = !caminataActiva" class="btn-dorado" [class.activo]="caminataActiva">
+            {{ caminataActiva ? '⏸️ Pausar' : '▶️ Caminar' }}
+          </button>
+          <button (click)="vistaPrimeraPersona = !vistaPrimeraPersona" class="btn-dorado" [class.activo]="vistaPrimeraPersona">
+            {{ vistaPrimeraPersona ? '🛰️ Ver Astronauta 3D' : '👁️ 1ra Persona' }}
+          </button>
+          <button (click)="dispararNodoEscapeClima()" class="btn-dorado btn-alerta">
+            🚨 Crear Nodo Escape ({{ datosMision?.total_nodos_urgencia || 0 }})
+          </button>
         </div>
       </div>
-      <div class="controles-demo">
-        <div class="slider-box">
-          <label>Tormenta: <strong>{{ intensidadTormenta }}</strong></label>
-          <input type="range" min="10" max="95" step="5" [value]="intensidadTormenta"
+
+      <!-- PANEL DERECHO: MAPA MOLA DE CRÁTERES, ONDA DE RADIACIÓN Y SALIDA EN TIEMPO REAL -->
+      <div class="panel-dorado panel-vision-3d">
+        <div class="etiqueta-superior-der">
+          <span class="icono-montana">🌐</span>
+          <span>Mapa MOLA Marte - Cráteres y Nodos</span>
+        </div>
+
+        <div id="canvas-vision-3d" class="lienzo-visor"></div>
+
+        <div class="barra-clima-derecha">
+          <label>☀️ Clima / RAD: <strong>{{ intensidadTormenta }}</strong></label>
+          <input type="range" min="10" max="90" step="2" [value]="intensidadTormenta"
                  (input)="cambiarTormenta($any($event.target).value)" />
+          <button (click)="reiniciarRecorrido()" class="btn-dorado-mini">
+            🔄 Reiniciar
+          </button>
         </div>
-        <button (click)="caminataActiva = !caminataActiva" [class.activo]="caminataActiva">
-          <i class="fas" [ngClass]="caminataActiva ? 'fa-pause' : 'fa-play'"></i>
-          {{ caminataActiva ? 'Pausar' : 'Caminar' }}
-        </button>
-        <button (click)="avanzarPasoAstronauta()" class="btn-accion"><i class="fas fa-forward-step"></i> Siguiente</button>
-        <button (click)="alternarTexturaMapa()"><i class="fas fa-layer-group"></i> MOLA/Curiosity</button>
-        <button (click)="reiniciarMision()"><i class="fas fa-rotate-right"></i> Reiniciar</button>
       </div>
-    </section>
 
-    <!-- Panel derecho: Visión 3D - Monte Sharp -->
-    <section class="panel panel-vision chamfer">
-      <div class="panel-header">
-        <span class="panel-icon"><i class="fas fa-mountain"></i></span>
-        <span class="panel-title">Visión 3D - Monte Sharp</span>
-      </div>
-      <div class="visor-3d-wrapper vision-wrapper">
-        <div id="canvas-hud-3d" class="lienzo-3d"></div>
-        <div class="hud-brujula">N {{ angulosCasco.rumboGrados }}° E | PENDIENTE {{ angulosCasco.inclinacionGrados }}°</div>
-        <div class="hud-alerta" *ngIf="datosMision" [ngClass]="'alerta-' + datosMision.alerta_radiacion.codigo_accion">
-          <i class="fas fa-triangle-exclamation"></i> {{ datosMision.alerta_radiacion.mensaje_hud }}
-        </div>
-        <div class="hud-timers" *ngIf="datosMision">
-          <div>FRENTE SOLAR: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_para_impacto_seg) }}</strong></div>
-          <div>MARGEN VITAL: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.margen_supervivencia_seg) }}</strong></div>
-          <div>DOSIS: <strong>{{ datosMision.calculos_fisicos.dosis_acumulada_uSv }} µSv</strong></div>
-        </div>
-      </div>
-    </section>
-  </main>
+    </div>
 
-  <!-- ZONA INFERIOR: panel horizontal dividido -->
-  <section class="panel panel-inferior chamfer">
-    <div class="inferior-grid">
-      <!-- Instrucciones -->
-      <div class="col-instrucciones">
-        <div class="panel-header">
-          <span class="panel-icon"><i class="fas fa-book"></i></span>
-          <span class="panel-title">Instrucciones</span>
+    <!-- FILA INFERIOR: INSTRUCCIONES TÁCTICAS AL ASTRONAUTA (IZQUIERDA) | DATOS EXACTOS 3 CAPAS NASA (DERECHA) -->
+    <div class="hud-fila-inferior panel-dorado" *ngIf="datosMision">
+
+      <!-- COLUMNA IZQUIERDA: INSTRUCCIONES EN VIVO PARA AVANZAR AL SIGUIENTE NODO -->
+      <div class="columna-instrucciones">
+        <div class="titulo-seccion-dorada">
+          <span class="icono-dorado">📖</span>
+          <h3>Instrucciones al Astronauta ({{ nodoActualId }} ➔ {{ datosMision.siguiente_waypoint }})</h3>
         </div>
         <ol class="lista-instrucciones">
-          <li>Usa los botones para avanzar en el simulador.</li>
-          <li>Observa el mapa y sigue la ruta.</li>
-          <li>Completa los nodos para explorar Monte Sharp.</li>
+          <li>1. <strong>Rumbo al Punto [{{ datosMision.siguiente_waypoint }}]:</strong> {{ datosMision.instrucciones_eva.paso_rumbo }}</li>
+          <li>2. <strong>Terreno USGS ({{ datosMision.codigo_usgs }}):</strong> {{ datosMision.instrucciones_eva.paso_terreno }}</li>
+          <li>3. <strong>Acción Climática:</strong> {{ datosMision.instrucciones_eva.paso_clima }}</li>
         </ol>
-      </div>
-      <!-- Separador vertical dorado -->
-      <div class="separador-vertical"></div>
-      <!-- Datos de la Ruta -->
-      <div class="col-datos">
-        <div class="panel-header">
-          <span class="panel-icon"><i class="fas fa-chart-bar"></i></span>
-          <span class="panel-title">Datos de la Ruta</span>
-        </div>
-        <div class="metricas" *ngIf="datosMision">
-          <div class="metrica">
-            <span class="metrica-icon"><i class="fas fa-ruler"></i></span>
-            <div class="metrica-texto">
-              <span class="metrica-label">Distancia Total</span>
-              <strong class="metrica-valor">{{ datosMision.calculos_fisicos.distancia_total_m }} m</strong>
-            </div>
-          </div>
-          <div class="metrica">
-            <span class="metrica-icon"><i class="fas fa-bolt"></i></span>
-            <div class="metrica-texto">
-              <span class="metrica-label">Velocidad</span>
-              <strong class="metrica-valor">{{ datosMision.calculos_fisicos.velocidad_real_m_s }} m/s</strong>
-            </div>
-          </div>
-          <div class="metrica">
-            <span class="metrica-icon"><i class="fas fa-clock"></i></span>
-            <div class="metrica-texto">
-              <span class="metrica-label">ETA Estimado</span>
-              <strong class="metrica-valor">{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong>
-            </div>
-          </div>
-        </div>
-        <div class="metricas" *ngIf="!datosMision">
-          <div class="metrica">
-            <span class="metrica-icon"><i class="fas fa-ruler"></i></span>
-            <div class="metrica-texto">
-              <span class="metrica-label">Distancia Total</span>
-              <strong class="metrica-valor">289.22 m</strong>
-            </div>
-          </div>
-          <div class="metrica">
-            <span class="metrica-icon"><i class="fas fa-bolt"></i></span>
-            <div class="metrica-texto">
-              <span class="metrica-label">Velocidad</span>
-              <strong class="metrica-valor">0.62 m/s</strong>
-            </div>
-          </div>
-          <div class="metrica">
-            <span class="metrica-icon"><i class="fas fa-clock"></i></span>
-            <div class="metrica-texto">
-              <span class="metrica-label">ETA Estimado</span>
-              <strong class="metrica-valor">78m 49s</strong>
-            </div>
-          </div>
+        <div class="estado-tactico-java">
+          <span>Clima MEDA: <strong>{{ datosMision.clima_meda.temp_c }}°C | Viento {{ datosMision.clima_meda.viento_kmh }} km/h | {{ datosMision.clima_meda.presion_hpa }} hPa</strong></span>
+          <span class="alerta-clima-texto">{{ datosMision.alerta_radiacion.mensaje_hud }}</span>
         </div>
       </div>
-    </div>
-  </section>
 
-  <!-- Panel PDR (nodos) -->
-  <section class="panel panel-pdr chamfer" *ngIf="datosMision">
-    <div class="panel-header">
-      <span class="panel-icon"><i class="fas fa-compass"></i></span>
-      <span class="panel-title">Nodos — {{ nodoActualId }} ➔ {{ datosMision.siguiente_waypoint }}</span>
+      <div class="divisor-vertical-dorado"></div>
+
+      <!-- COLUMNA DERECHA: DATOS EXACTOS DE LA RUTA Y LAS 3 CAPAS CIENTÍFICAS -->
+      <div class="columna-datos-ruta">
+        <div class="titulo-seccion-dorada">
+          <span class="icono-dorado">📊</span>
+          <h3>Datos de la Ruta</h3>
+        </div>
+
+        <!-- 1. Topografía MOLA + Distancia -->
+        <div class="fila-dato-ruta">
+          <span class="icono-blanco">⛰️</span>
+          <span>
+            Distancia: <strong>{{ datosMision.calculos_fisicos.distancia_total_m }} m</strong>
+            | 1. MOLA: <strong>{{ datosMision.altitud_actual_m }} m (Pendiente {{ datosMision.pendiente_actual_grados }}°)</strong>
+          </span>
+        </div>
+
+        <!-- 2. Cinemática EVA + Geología USGS SIM 3292 -->
+        <div class="fila-dato-ruta">
+          <span class="icono-blanco">🧭</span>
+          <span>
+            Velocidad: <strong>{{ datosMision.calculos_fisicos.velocidad_real_m_s }} m/s</strong>
+            | 2. USGS: <strong>{{ datosMision.unidad_geologica }}</strong>
+          </span>
+        </div>
+
+        <!-- 3. ETA + Dosimetría RAD Exacta -->
+        <div class="fila-dato-ruta">
+          <span class="icono-blanco">🕒</span>
+          <span>
+            ETA: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong>
+            | 3. RAD: <strong style="color: #fbbf24;">{{ datosMision.dosis_uSv_h }} µSv/h (Escudo {{ datosMision.blindaje_pct }}%)</strong>
+          </span>
+        </div>
+      </div>
+
     </div>
-    <ul class="lista-nodos">
-      <li *ngFor="let nodo of datosMision.ruta_grafo_java; let i = index"
-          (click)="seleccionarNodoMapa(nodo.id)"
-          [class.nodo-refugio-li]="nodo.tipo === 'REFUGIO'">
-        <span class="badge-nodo">{{ i === 0 ? '' : nodo.id }}<i *ngIf="i === 0" class="fas fa-person-walking"></i></span>
-        <strong>{{ nodo.nombre }}</strong>
-        <small> | {{ nodo.altitud }}m | {{ nodo.pendiente }}° | {{ nodo.rad_nodo }} µSv/h</small>
-      </li>
-    </ul>
-    <div class="pdr-footer">
-      <div>O2 TRAJE: <strong>{{ datosMision.calculos_fisicos.oxigeno_pct }}%</strong></div>
-      <div>ETA: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong></div>
-    </div>
-  </section>
+
+  </div>
 </div>
