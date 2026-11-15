@@ -1,0 +1,14 @@
+﻿marte-hud/node_modules/
+marte-hud/.angular/
+marte-hud/dist/
+node_modules/
+.angular/
+Java_Grafos_Rutas/*.class
+*.class
+Python_Calculos_API/__pycache__/
+__pycache__/
+*.pyc
+Python_Calculos_API/*.tif
+Python_Calculos_API/*.tiff
+*.tif
+*.tiff

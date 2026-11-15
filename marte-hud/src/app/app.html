@@ -1,0 +1,229 @@
+<div class="hud-marco-exterior">
+  <div class="hud-contenedor-dorado">
+
+    <!-- Barra superior: tabletas de los astronautas conectados y selector de destino -->
+    <div class="barra-google-maps-marte">
+
+      <div class="selector-destino-box" *ngIf="listaAstronautas.length === 0">
+        <span style="color: #fbbf24;">
+          0 Astronautas en el mapa — Abre <strong>http://10.229.159.113:8080</strong> en los teléfonos para que aparezcan aquí.
+        </span>
+      </div>
+
+      <div class="selector-destino-box" *ngIf="listaAstronautas.length > 0">
+        <span>Tabletas Conectadas ({{ listaAstronautas.length }}):</span>
+        <button *ngFor="let a of listaAstronautas"
+                (click)="seleccionarAstronautaFoco(a.id)"
+                class="globo-ruta"
+                [class.globo-activo]="a.id === idAstroEnFoco"
+                [style.border-color]="a.color">
+          <span [style.color]="a.color">●</span>
+          <strong>Tableta {{ a.id }}</strong> ({{ a.destino }})
+        </button>
+      </div>
+
+      <div class="selector-destino-box" *ngIf="astroEnFoco">
+        <span>Asignar Ruta a [{{ astroEnFoco.id }}]:</span>
+        <select (change)="cambiarDestinoDeFoco($any($event.target).value)" class="select-dorado">
+          <option value="META" [selected]="astroEnFoco.destino === 'META'">META: Boxwork Oriental (-3204m)</option>
+          <option value="S5" [selected]="astroEnFoco.destino === 'S5'">S5: Refugio Boreal Norte (-3204m)</option>
+          <option value="C4" [selected]="astroEnFoco.destino === 'C4'">C4: Cuenca Central (-3222m)</option>
+          <option value="B2" [selected]="astroEnFoco.destino === 'B2'">B2: Sector Austral Sur (-3226m)</option>
+          <option value="N0" [selected]="astroEnFoco.destino === 'N0'">N0: Base Hábitat Occidental (-3242m)</option>
+        </select>
+      </div>
+
+      <div class="acciones-waze-voz">
+        <button *ngIf="astroEnFoco" (click)="colocarPinDesdeTabletaActiva()" class="btn-voz voz-activa">
+          Poner Pin con Tableta [{{ astroEnFoco.id }}]
+        </button>
+        <button *ngIf="astroEnFoco" (click)="activarAutoRuta()" class="btn-voz" [class.voz-activa]="!astroEnFoco.modoManual">
+          {{ astroEnFoco.modoManual ? 'En Manual (Pasar a Auto)' : 'Auto-Ruta ON' }}
+        </button>
+        <button (click)="alternarAsistenteVoz()" class="btn-voz" [class.voz-activa]="vozActiva">
+          {{ vozActiva ? 'Voz: ON' : 'Voz: OFF' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Barra para editar la descripcion de los pines y elegir si son punto de interes o peligro -->
+    <div class="barra-google-maps-marte" *ngIf="obstaculosCooperativos.length > 0" style="border-color: #38bdf8; background: rgba(10, 22, 36, 0.95);">
+      <div class="selector-destino-box">
+        <span style="color: #7dd3fc;">Pines en Mapa ({{ obstaculosCooperativos.length }}):</span>
+        <select (change)="seleccionarPinParaEditar($any($event.target).value)" class="select-dorado">
+          <option *ngFor="let p of obstaculosCooperativos" [value]="p.id" [selected]="p.id === pinSeleccionadoId">
+            {{ p.bloquea ? '[EVADIR]' : '[INTERÉS]' }} {{ p.id }} (de {{ p.autor }}): "{{ p.etiqueta }}"
+          </option>
+        </select>
+      </div>
+
+      <ng-container *ngIf="pinSeleccionadoObj && pinSeleccionadoObj.autor === idAstroEnFoco">
+        <div class="selector-destino-box">
+          <span style="color: #4ade80;">Descripción (Tableta {{ idAstroEnFoco }}):</span>
+          <input type="text"
+                 [value]="etiquetaPinTemporal"
+                 (input)="etiquetaPinTemporal = $any($event.target).value"
+                 placeholder="Ej. Piedra rara, Muestra, Grieta..."
+                 class="select-dorado"
+                 style="min-width: 210px;" />
+        </div>
+        <div class="acciones-waze-voz">
+          <button (click)="clasificarPinDesdePC(false)" class="btn-voz" [class.voz-activa]="!pinSeleccionadoObj.bloquea">
+            Punto de Interés (No Desvía)
+          </button>
+          <button (click)="clasificarPinDesdePC(true)" class="btn-waze" [style.background]="pinSeleccionadoObj.bloquea ? '#dc2626' : ''">
+            Peligro / Evadir (Rodear)
+          </button>
+          <button (click)="eliminarPinDesdePC(pinSeleccionadoObj.id)" class="btn-waze-limpiar">
+            Quitar Pin
+          </button>
+        </div>
+      </ng-container>
+
+      <div class="selector-destino-box" *ngIf="pinSeleccionadoObj && pinSeleccionadoObj.autor !== idAstroEnFoco">
+        <span style="color: #fde047;">
+          Pin de <strong>[{{ pinSeleccionadoObj.autor }}]</strong>: <em>"{{ pinSeleccionadoObj.etiqueta }}"</em>
+        </span>
+        <button (click)="seleccionarAstronautaFoco(pinSeleccionadoObj.autor)" class="btn-voz voz-activa">
+          Cambiar a Tableta {{ pinSeleccionadoObj.autor }} para Editar
+        </button>
+      </div>
+    </div>
+
+    <!-- Mapa principal 2D de Marte -->
+    <div class="hud-fila-superior fila-mapa-unico-2d">
+      <div class="panel-dorado panel-topview-2d">
+        <div class="etiqueta-superior-izq">
+          <span class="icono-pin">MOLA</span>
+          <span>
+            Mapa 2D | Astronautas Conectados: {{ listaAstronautas.length }}
+            <ng-container *ngIf="astroEnFoco"> | Tableta Activa: {{ astroEnFoco.id }}</ng-container>
+            | Pines: {{ obstaculosCooperativos.length }}
+          </span>
+        </div>
+
+        <div class="banner-aviso-crater" *ngIf="avisoRutaCraterOClima">
+          {{ avisoRutaCraterOClima }}
+        </div>
+
+        <div class="brujula-norte" [style.transform]="'rotate(' + (-(astroEnFoco?.rumbo || 0)) + 'deg)'">
+          <span class="letra-n">N</span>
+          <div class="flecha-norte"></div>
+        </div>
+
+        <div id="canvas-vision-3d"
+             class="lienzo-visor"
+             [class.cursor-radiacion]="herramientaMapaActiva !== 'NINGUNA'">
+        </div>
+
+        <!-- Controles inferiores del mapa: meteoritos, radiacion y destino con clic -->
+        <div class="barra-clima-derecha barra-controles-debajo-mapa">
+          <button (click)="seleccionarHerramientaMapa('METEORITO')"
+                  class="btn-accion-mapa btn-meteorito"
+                  [class.activo]="herramientaMapaActiva === 'METEORITO'">
+            1. {{ herramientaMapaActiva === 'METEORITO' ? 'CLIC EN MAPA = Soltar Meteorito' : 'Seleccionar Meteorito (Clic en Mapa)' }}
+          </button>
+
+          <button (click)="seleccionarHerramientaMapa('RADIACION')"
+                  class="btn-accion-mapa btn-mouse-rad"
+                  [class.activo]="herramientaMapaActiva === 'RADIACION'">
+            2. {{ herramientaMapaActiva === 'RADIACION' ? 'CLIC/MOVER = Centro de Radiación' : 'Seleccionar Radiación (Clic en Mapa)' }}
+          </button>
+
+          <button *ngIf="astroEnFoco"
+                  (click)="seleccionarHerramientaMapa('DESTINO_ASTRO')"
+                  class="btn-accion-mapa btn-voz"
+                  [class.voz-activa]="herramientaMapaActiva === 'DESTINO_ASTRO'">
+            3. {{ herramientaMapaActiva === 'DESTINO_ASTRO' ? 'CLIC EN MAPA = Destino de ' + astroEnFoco.id : 'Trazar Ruta de [' + astroEnFoco.id + '] con Clic' }}
+          </button>
+
+          <div class="slider-rango-rad">
+            <label>Rango RAD: <strong>{{ intensidadTormenta }}</strong></label>
+            <input type="range" min="10" max="90" step="2" [value]="intensidadTormenta"
+                   (input)="cambiarTormentaDesdePC($any($event.target).value)" />
+          </div>
+
+          <button (click)="reiniciarRecorrido()" class="btn-dorado-mini">
+            Reiniciar
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel inferior de instrucciones y grafica de elevacion MOLA -->
+    <div class="hud-fila-inferior panel-dorado" *ngIf="datosMision">
+
+      <div class="columna-instrucciones">
+        <div class="titulo-seccion-dorada">
+          <h3>Indicaciones en Vivo ({{ listaAstronautas.length }} Astronauta(s) en Línea)</h3>
+        </div>
+        <ol class="lista-instrucciones" *ngIf="listaAstronautas.length > 0">
+          <li *ngFor="let a of listaAstronautas"
+              (click)="seleccionarAstronautaFoco(a.id)"
+              style="cursor:pointer; padding:3px 6px; border-radius:6px;"
+              [style.background]="a.id === idAstroEnFoco ? 'rgba(251, 191, 36, 0.16)' : 'transparent'">
+            <strong [style.color]="a.color">Tableta {{ a.id }} (➔ {{ a.destino }}):</strong>
+            Rumbo {{ a.rumbo }}° hacia <strong>[{{ a.rutaCalculada[0]?.id || a.destino }}]</strong>
+            | Dist: <strong>{{ calcularDistanciaMetaAstro(a) }}m</strong>
+          </li>
+        </ol>
+        <p *ngIf="listaAstronautas.length === 0" style="color:#94a3b8; font-size:13px; padding:8px 0;">
+          Ningún dispositivo conectado actualmente. En cuanto un teléfono abra el enlace, aparecerá aquí su tableta y su ruta.
+        </p>
+        <div class="estado-tactico-java">
+          <span>Pines de Interés: <strong>{{ totalPinesInformativos }}</strong> | Pines a Evadir: <strong>{{ totalPinesPeligro }}</strong></span>
+          <span class="alerta-clima-texto">{{ datosMision.alerta_radiacion.mensaje_hud }}</span>
+        </div>
+      </div>
+
+      <div class="divisor-vertical-dorado"></div>
+
+      <div class="columna-datos-ruta">
+        <div class="titulo-seccion-dorada">
+          <h3>Telemetría de Tableta [{{ astroEnFoco?.id || 'En Espera' }}]</h3>
+        </div>
+
+        <div class="fila-dato-ruta">
+          <span>
+            Distancia a Meta: <strong>{{ datosMision.calculos_fisicos.distancia_total_m }} m</strong>
+            | Altitud MOLA: <strong>-3225.4 m</strong>
+          </span>
+        </div>
+
+        <div class="fila-dato-ruta">
+          <span>
+            Velocidad EVA: <strong>0.62 m/s</strong>
+            | Geología USGS: <strong>{{ datosMision.unidad_geologica }}</strong>
+          </span>
+        </div>
+
+        <div class="fila-dato-ruta">
+          <span>
+            ETA: <strong>{{ formatearTiempo(datosMision.alerta_radiacion.tiempo_llegada_refugio_seg) }}</strong>
+            | RAD: <strong style="color: #fbbf24;">{{ datosMision.dosis_uSv_h }} µSv/h (Dist: {{ distanciaAstronautaARadiacionM }}m)</strong>
+          </span>
+        </div>
+
+        <div class="contenedor-perfil-elevacion">
+          <div class="etiqueta-perfil">
+            <span>Perfil Altimétrico MOLA (-3242m a -3204m)</span>
+            <span>Avance: {{ porcentajeProgresoMapa }}%</span>
+          </div>
+          <svg viewBox="0 0 300 44" class="svg-perfil-mola">
+            <defs>
+              <linearGradient id="gradElev" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#22c55e" stop-opacity="0.65"/>
+                <stop offset="100%" stop-color="#0b0b0b" stop-opacity="0.1"/>
+              </linearGradient>
+            </defs>
+            <path [attr.d]="svgPathAreaElevacion" fill="url(#gradElev)" />
+            <path [attr.d]="svgPathLineaElevacion" fill="none" stroke="#4ade80" stroke-width="2.2" />
+            <circle [attr.cx]="posCursorPerfil.x" [attr.cy]="posCursorPerfil.y" r="4.5" fill="#facc15" stroke="#ef4444" stroke-width="1.8" />
+          </svg>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>

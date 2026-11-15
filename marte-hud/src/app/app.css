@@ -1,0 +1,892 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.hud-marco-exterior {
+  background-color: #030303;
+  min-height: 100vh;
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  color: #f8fafc;
+}
+
+/* Marco Principal Sci-Fi Dorado con Esquinas Biseladas */
+.hud-contenedor-dorado {
+  width: 100%;
+  max-width: 1280px;
+  background: linear-gradient(180deg, #141109 0%, #090805 100%);
+  border: 3px solid #f59e0b;
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 0 28px rgba(245, 158, 11, 0.35), inset 0 0 18px rgba(245, 158, 11, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hud-fila-superior {
+  display: grid;
+  grid-template-columns: 1.55fr 1fr;
+  gap: 16px;
+  height: 430px;
+}
+
+.panel-dorado {
+  position: relative;
+  background: #0b0b0b;
+  border: 2.5px solid #fbbf24;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: inset 0 0 14px rgba(251, 191, 36, 0.22);
+}
+
+.lienzo-visor {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+.lienzo-visor:active {
+  cursor: grabbing;
+}
+
+/* Etiquetas Superiores ("Mapa Mini" y "Visión 3D - Monte Sharp") */
+.etiqueta-superior-izq {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(18, 18, 18, 0.88);
+  border: 1.5px solid rgba(251, 191, 36, 0.6);
+  padding: 7px 18px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+}
+
+.etiqueta-superior-der {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  background: rgba(18, 18, 18, 0.9);
+  border: 1.5px solid rgba(251, 191, 36, 0.55);
+  padding: 7px 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  z-index: 10;
+}
+
+/* Brújula Circular N idéntica a la imagen */
+.brujula-norte {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #1e1e1e 0%, #090909 100%);
+  border: 2.5px solid #e2e8f0;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.85);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: transform 0.2s ease-out;
+}
+.letra-n {
+  font-size: 12px;
+  font-weight: 900;
+  color: #ffffff;
+  margin-bottom: 2px;
+}
+.flecha-norte {
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 20px solid #ffffff;
+}
+
+/* Controles interactivos sobre Mapa Mini y Visión 3D */
+.controles-mini-flotantes {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+  flex-wrap: wrap;
+}
+.btn-dorado {
+  background: rgba(20, 16, 8, 0.92);
+  border: 1.5px solid #fbbf24;
+  color: #fde68a;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.btn-dorado:hover, .btn-dorado.activo {
+  background: #f59e0b;
+  color: #000000;
+}
+.btn-dorado.btn-alerta {
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+.btn-dorado.btn-alerta:hover {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+.barra-clima-derecha {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  background: rgba(15, 15, 15, 0.9);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  padding: 6px 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  z-index: 10;
+}
+.btn-dorado-mini {
+  background: #f59e0b;
+  color: #000;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* PANEL INFERIOR: INSTRUCCIONES Y DATOS DE LA RUTA */
+.hud-fila-inferior {
+  display: grid;
+  grid-template-columns: 1.25fr 2px 1fr;
+  align-items: center;
+  padding: 18px 26px;
+  background: linear-gradient(180deg, #14120d 0%, #0c0b08 100%);
+  gap: 24px;
+}
+
+.titulo-seccion-dorada {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.45);
+  padding-bottom: 6px;
+  margin-bottom: 12px;
+}
+.titulo-seccion-dorada h3 {
+  color: #fbbf24;
+  font-size: 20px;
+  font-weight: 700;
+}
+.icono-dorado {
+  font-size: 20px;
+}
+
+.lista-instrucciones {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 15.5px;
+  color: #f1f5f9;
+}
+
+.estado-tactico-java {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(251, 191, 36, 0.3);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #fde68a;
+}
+.alerta-clima-texto {
+  color: #38bdf8;
+  font-weight: 700;
+}
+
+.divisor-vertical-dorado {
+  width: 2px;
+  height: 100%;
+  background: linear-gradient(180deg, transparent, #f59e0b, transparent);
+}
+
+.columna-datos-ruta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fila-dato-ruta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 17px;
+  color: #f8fafc;
+}
+.fila-dato-ruta strong {
+  color: #ffffff;
+  font-weight: 700;
+}
+.icono-blanco {
+  font-size: 17px;
+  width: 24px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .hud-fila-superior {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .panel-mapa-mini, .panel-vision-3d {
+    height: 320px;
+  }
+  .hud-fila-inferior {
+    grid-template-columns: 1fr;
+  }
+  .divisor-vertical-dorado {
+    display: none;
+  }
+}
+
+/* Barra superior tipo Google Maps / Waze integrada en el marco dorado */
+.barra-google-maps-marte {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: rgba(18, 15, 9, 0.95);
+  border: 1.5px solid rgba(251, 191, 36, 0.55);
+  border-radius: 12px;
+  padding: 8px 14px;
+}
+
+.selector-destino-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.select-dorado {
+  background: #090909;
+  color: #f8fafc;
+  border: 1.5px solid #f59e0b;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Globos de Rutas Alternativas (Estilo Google Maps) */
+.globos-rutas-gmaps {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.globo-ruta {
+  background: #141414;
+  border: 1.5px solid #475569;
+  color: #cbd5e1;
+  padding: 5px 11px;
+  border-radius: 20px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: 0.2s;
+}
+.globo-ruta.globo-activo {
+  background: rgba(37, 99, 235, 0.28);
+  border-color: #60a5fa;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.45);
+}
+.globo-ruta.globo-peligro {
+  border-color: #ef4444;
+}
+.badge-riesgo {
+  background: #1e293b;
+  color: #fcd34d;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.badge-seguro {
+  background: rgba(16, 185, 129, 0.22);
+  color: #34d399;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+/* Botones de Incidencias Waze y Voz */
+.acciones-waze-voz {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.btn-waze {
+  background: rgba(234, 88, 12, 0.2);
+  border: 1px solid #f97316;
+  color: #fed7aa;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-waze:hover {
+  background: #ea580c;
+  color: #ffffff;
+}
+.btn-waze-limpiar {
+  background: #7f1d1d;
+  border: 1px solid #f87171;
+  color: #ffffff;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.btn-voz {
+  background: #1e293b;
+  border: 1.5px solid #94a3b8;
+  color: #e2e8f0;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-voz.voz-activa {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  color: #6ee7b7;
+}
+
+/* Perfil de Elevación MOLA en Vivo */
+.contenedor-perfil-elevacion {
+  margin-top: 4px;
+  background: rgba(10, 10, 10, 0.85);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 8px;
+  padding: 5px 10px;
+}
+.etiqueta-perfil {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #fde68a;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+.svg-perfil-mola {
+  width: 100%;
+  height: 38px;
+  display: block;
+}
+
+/* Botones de cambio entre Vista PC y Controlador Celular */
+.selector-rol-dispositivo {
+  display: flex;
+  gap: 6px;
+}
+.btn-rol {
+  background: #141414;
+  border: 1.5px solid #475569;
+  color: #cbd5e1;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-rol.rol-activo {
+  background: #f59e0b;
+  border-color: #fde68a;
+  color: #000000;
+}
+
+.banner-alerta-celular {
+  background: rgba(16, 185, 129, 0.2);
+  border: 1.5px solid #10b981;
+  color: #a7f3d0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.banner-alerta-celular.peligro {
+  background: rgba(220, 38, 38, 0.32);
+  border-color: #f87171;
+  color: #fecaca;
+}
+
+/* JOYSTICK / PAD DIRECCIONAL TÁCTIL SOBRE EL VISOR DEL CELULAR */
+.joystick-eva-container {
+  position: absolute;
+  bottom: 48px;
+  right: 14px;
+  background: rgba(12, 10, 6, 0.86);
+  border: 2px solid rgba(251, 191, 36, 0.75);
+  border-radius: 14px;
+  padding: 8px;
+  z-index: 15;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8);
+  user-select: none;
+}
+.dpad-titulo {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fbbf24;
+  margin-bottom: 5px;
+  letter-spacing: 0.5px;
+}
+.dpad-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 38px);
+  grid-template-rows: repeat(3, 38px);
+  gap: 4px;
+}
+.dpad-grid button {
+  background: #1e293b;
+  border: 1.5px solid #475569;
+  color: #ffffff;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 0.1s;
+}
+.dpad-grid button.btn-principal-dpad {
+  background: rgba(37, 99, 235, 0.45);
+  border-color: #60a5fa;
+}
+.dpad-grid button.btn-centro-nodo {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: #fbbf24;
+}
+.dpad-grid button:active {
+  background: #f59e0b !important;
+  color: #000 !important;
+  transform: scale(0.94);
+}
+
+/* Adaptación cuando está activo el Modo Controlador Celular */
+.fila-solo-celular {
+  grid-template-columns: 1fr !important;
+}
+.oculto-en-modo-celular {
+  display: none !important;
+}
+
+/* PALANQUITA ANALÓGICA 360° (THUMBSTICK CIRCULAR DESLIZABLE) */
+.contenedor-palanquita {
+  position: absolute;
+  bottom: 52px;
+  right: 18px;
+  background: rgba(12, 10, 6, 0.88);
+  border: 2px solid #fbbf24;
+  border-radius: 18px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 20;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85), inset 0 0 12px rgba(245, 158, 11, 0.25);
+  user-select: none;
+  touch-action: none;
+}
+
+.titulo-palanquita {
+  font-size: 10.5px;
+  font-weight: 900;
+  color: #fde68a;
+  margin-bottom: 6px;
+  letter-spacing: 0.6px;
+}
+
+.base-palanquita {
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #1e293b 0%, #090d16 100%);
+  border: 2.5px solid rgba(251, 191, 36, 0.75);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.9);
+}
+
+.anillo-guia-palanca {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 1px dashed rgba(148, 163, 184, 0.45);
+  pointer-events: none;
+}
+
+.perilla-palanquita {
+  position: absolute;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fbbf24, #d97706);
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.8), 0 0 12px rgba(245, 158, 11, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  pointer-events: none;
+  transition: transform 0.04s linear;
+}
+
+.estado-palanquita {
+  margin-top: 6px;
+  font-size: 10.5px;
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+.btn-derrumbe-frente {
+  border-color: #f97316 !important;
+  color: #fed7aa !important;
+}
+.btn-derrumbe-frente:hover {
+  background: #ea580c !important;
+  color: #ffffff !important;
+}
+
+.indicador-enlace-celular {
+  background: #1e293b;
+  border: 1px solid #475569;
+  color: #94a3b8;
+  padding: 5px 10px;
+  border-radius: 16px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+.indicador-enlace-celular.conectado {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: #10b981;
+  color: #34d399;
+}
+
+/* ========================================================================= */
+/* ESTILOS DE LA VISTA EXTERNA INDEPENDIENTE DEL CELULAR (?celular=1)        */
+/* ========================================================================= */
+.celular-hud-independiente {
+  width: 100vw;
+  height: 100vh;
+  background: #050505;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px;
+  font-family: 'Segoe UI', Roboto, sans-serif;
+  color: #f8fafc;
+  overflow: hidden;
+  user-select: none;
+}
+
+.celular-header {
+  background: linear-gradient(180deg, #16130b 0%, #0c0a06 100%);
+  border: 2px solid #f59e0b;
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.celular-header.alerta-activa {
+  border-color: #ef4444;
+  background: linear-gradient(180deg, #2b0b0b 0%, #140505 100%);
+}
+.cel-titulo {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fbbf24;
+}
+.cel-rumbo {
+  color: #38bdf8;
+}
+.cel-mensaje-hud {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.celular-visor-box {
+  position: relative;
+  flex: 1;
+  margin: 8px 0;
+  border: 2px solid #fbbf24;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+}
+.cel-brujula {
+  width: 46px !important;
+  height: 46px !important;
+  top: 10px !important;
+  right: 10px !important;
+}
+.cel-telemetria-overlay {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  background: rgba(10, 10, 10, 0.85);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: flex;
+  justify-content: space-around;
+  font-size: 12px;
+}
+
+/* PAD TÁCTIL DIGITAL (TOUCHPAD VECTORIAL) */
+.celular-zona-control {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 10px;
+  height: 175px;
+}
+
+.touchpad-digital {
+  position: relative;
+  background: radial-gradient(circle at center, rgba(14, 116, 144, 0.25) 0%, #090d16 100%);
+  border: 2px solid #38bdf8;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  cursor: crosshair;
+  overflow: hidden;
+  box-shadow: inset 0 0 22px rgba(56, 189, 248, 0.25);
+}
+
+.reticula-touchpad {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 1.5px dashed rgba(56, 189, 248, 0.45);
+  pointer-events: none;
+}
+.eje-h-touchpad {
+  position: absolute;
+  width: 80%;
+  height: 1px;
+  background: rgba(56, 189, 248, 0.25);
+  pointer-events: none;
+}
+.eje-v-touchpad {
+  position: absolute;
+  width: 1px;
+  height: 80%;
+  background: rgba(56, 189, 248, 0.25);
+  pointer-events: none;
+}
+.svg-vector-touch {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+}
+
+.cursor-touch-digital {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.35);
+  border: 2.5px solid #38bdf8;
+  box-shadow: 0 0 14px #38bdf8;
+  pointer-events: none;
+  transition: transform 0.03s linear;
+}
+.cursor-touch-digital.activo {
+  background: #fbbf24;
+  border-color: #ffffff;
+  box-shadow: 0 0 18px #f59e0b;
+}
+
+.texto-guia-touch {
+  position: absolute;
+  bottom: 6px;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #7dd3fc;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+
+.celular-botones-accion {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+}
+.btn-cel {
+  flex: 1;
+  background: #141414;
+  border: 1.5px solid #fbbf24;
+  color: #fde68a;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-cel.activo {
+  background: #f59e0b;
+  color: #000;
+}
+.btn-cel-nodo {
+  border-color: #d946ef;
+  color: #f5d0fe;
+}
+.btn-cel-derrumbe {
+  border-color: #f97316;
+  color: #fed7aa;
+}
+
+/* Mapa Top-View 2D único a ancho completo (Estilo Google Maps) */
+.fila-mapa-unico-2d {
+  grid-template-columns: 1fr !important;
+  height: 460px !important;
+}
+
+.panel-topview-2d {
+  width: 100%;
+  height: 100%;
+}
+
+.cursor-radiacion {
+  cursor: crosshair !important;
+}
+
+.barra-controles-debajo-mapa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px !important;
+  background: rgba(12, 10, 6, 0.94) !important;
+  border: 1.5px solid #fbbf24 !important;
+}
+
+.btn-accion-mapa {
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.btn-meteorito {
+  background: linear-gradient(180deg, #9a3412 0%, #7c2d12 100%);
+  border: 1.5px solid #fb923c;
+  color: #ffedd5;
+}
+.btn-meteorito:hover {
+  background: #ea580c;
+  color: #ffffff;
+}
+
+.btn-mouse-rad {
+  background: #1e293b;
+  border: 1.5px solid #facc15;
+  color: #fef08a;
+}
+.btn-mouse-rad.activo {
+  background: #dc2626;
+  border-color: #ffffff;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.8);
+}
+
+.slider-rango-rad {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fde68a;
+  font-size: 12.5px;
+}
+
+.btn-meteorito.activo {
+  background: #ea580c !important;
+  border-color: #ffffff !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(249, 115, 22, 0.9);
+}
+
+.banner-aviso-crater {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(185, 28, 28, 0.94);
+  border: 2px solid #fde047;
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 800;
+  z-index: 25;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
